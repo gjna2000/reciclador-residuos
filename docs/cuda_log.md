@@ -17,7 +17,7 @@ Los mensajes de commit se escriben en inglés (por ejemplo, `docs(cuda): update 
 | Capacidad de cómputo | 7.5 (arquitectura Turing, sin tensor cores) |
 | PyTorch | 2.15.0+cu132 |
 | CUDA | 13.2 |
-| Sistema | Windows, entorno virtual `cuda_env` |
+| Sistema | WSL con Ubuntu, entorno virtual `cuda_env` |
 | Modelo probado | [watersplash/waste-classification](https://huggingface.co/watersplash/waste-classification) (ViT, 85,8 M de parámetros, 12 clases) |
 | Imagen de prueba vigente | `tests/images/large_bottle.jpg`, 1200 × 1200 px |
 
@@ -142,3 +142,35 @@ Las entradas nuevas van arriba.
 - [ ] Medir las etapas del pipeline real (filtro, clasificación, total) cuando Javier tenga `pipeline.analyze`
 - [ ] Escribir `docs/cuda.md` con nuestras palabras: qué corre en el host, qué en el device y cómo viajan los datos (fecha límite: sábado 7 de noviembre)
 - [ ] Preparar la explicación para la sustentación: 2 minutos sobre CUDA y la comparación CPU contra GPU
+
+---
+
+## 7. Convención de commits
+
+Los mensajes de commit se escriben **en inglés**, con el formato `tipo(ámbito): descripción en imperativo`, en minúsculas y sin punto final.
+
+| Tipo | Cuándo |
+| --- | --- |
+| `feat` | Funcionalidad nueva |
+| `fix` | Corrección de un error |
+| `docs` | Documentación o evidencia |
+| `perf` | Mejora o medición de rendimiento |
+| `refactor` | Cambio interno sin alterar el comportamiento |
+| `test` | Pruebas |
+| `chore` | Dependencias y mantenimiento |
+
+Ejemplos:
+
+```text
+feat(cuda): add device selection helpers
+feat(cuda): add CPU vs GPU benchmark with fp32 and fp16
+docs(cuda): add GPU evidence screenshots
+docs(cuda): add CUDA work log
+perf(cuda): keep fp32 on GPU after fp16 measured slower
+```
+
+Para ver el historial de commits y completarlo aquí cuando haga falta:
+
+```bash
+git log --oneline --author="Tu nombre en GitHub"
+```
