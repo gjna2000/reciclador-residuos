@@ -1,0 +1,16 @@
+[server]
+# Tamaño máximo (en MB) de cada imagen cargada con st.file_uploader.
+maxUploadSize = 10
+
+[theme]
+base = "light"
+primaryColor = "#2F5D46"
+backgroundColor = "#FBFBF8"
+secondaryBackgroundColor = "#F1F3EC"
+textColor = "#2C3531"
+
+[client]
+toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false
