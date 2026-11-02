@@ -13,7 +13,7 @@ CLASSIFICATION_THRESHOLD = 0.60
 
 # Configuración de inferencia
 
-USE_FP16 = True
+USE_FP16 = False
 
 # Clases reconocidas por el clasificador
 
