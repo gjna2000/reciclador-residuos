@@ -39,7 +39,7 @@ RECYCLING_RULES = {
         "tip": "Deposita aquí los residuos no aprovechables."
     },
     "Battery": {
-        "bin": "Special collection",
+        "bin": "Punto-especial",
         "tip": "Lleva las baterías a un punto de recolección posconsumo."
     },
     "Clothes": {
