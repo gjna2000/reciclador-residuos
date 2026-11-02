@@ -24,7 +24,7 @@ def analyze(image, gate, classifier, device="cuda") -> AnalysisResult:
         timings["total_ms"] = (perf_counter() - total_start) * 1000
 
         return AnalysisResult(
-            status="no es residuo",
+            status="no_es_residuo",
             top=[],
             bin=None,
             tip="La imagen no parece contener un residuo. Intenta con otra imagen.",
