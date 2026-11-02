@@ -3,39 +3,39 @@
 
 RECYCLING_RULES = {
     "Plastic": {
-        "bin": "White",
+        "bin": "Blanco",
         "tip": "Limpia el envase antes de depositarlo."
     },
     "Metal": {
-        "bin": "White",
+        "bin": "Blanco",
         "tip": "Separa los elementos metálicos y procura limpiarlos."
     },
     "Paper": {
-        "bin": "White",
+        "bin": "Blanco",
         "tip": "Deposita el papel limpio y seco."
     },
     "Cardboard": {
-        "bin": "White",
+        "bin": "Blanco",
         "tip": "Pliega el cartón para facilitar su almacenamiento."
     },
     "Green-Glass": {
-        "bin": "White",
+        "bin": "Blanco",
         "tip": "Deposita el vidrio aprovechable limpio y separado."
     },
     "White-Glass": {
-        "bin": "White",
+        "bin": "Blanco",
         "tip": "Separa el vidrio aprovechable y evita mezclarlo con otros residuos."
     },
     "Biological": {
-        "bin": "Green",
+        "bin": "Verde",
         "tip": "Los residuos orgánicos aprovechables pueden convertirse en abono."
     },
     "Brown-grass": {
-        "bin": "Green",
+        "bin": "Verde",
         "tip": "Aprovecha los residuos vegetales mediante compostaje."
     },
     "Trash": {
-        "bin": "Black",
+        "bin": "Negro",
         "tip": "Deposita aquí los residuos no aprovechables."
     },
     "Battery": {
