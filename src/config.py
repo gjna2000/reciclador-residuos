@@ -9,7 +9,11 @@ CLASSIFIER_MODEL_ID = "watersplash/waste-classification"
 
 TOP_K = 3
 
+# Umbral del Gate CLIP
 GATE_THRESHOLD = 0.60
+
+# Umbral mínimo de confianza del clasificador
+CLASSIFICATION_THRESHOLD = 0.60
 
 # Configuración de inferencia
 
