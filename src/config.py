@@ -9,7 +9,7 @@ CLASSIFIER_MODEL_ID = "watersplash/waste-classification"
 
 TOP_K = 3
 
-CLASSIFICATION_THRESHOLD = 0.60
+GATE_THRESHOLD = 0.60
 
 # Configuración de inferencia
 
