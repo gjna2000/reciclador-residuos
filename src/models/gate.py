@@ -2,7 +2,7 @@
 import torch
 from transformers import CLIPModel, CLIPProcessor
 
-from ..config import GATE_MODEL_ID, CLASSIFICATION_THRESHOLD
+from ..config import GATE_MODEL_ID, GATE_THRESHOLD
 
 
 class Gate:
@@ -47,6 +47,6 @@ class Gate:
         score = probabilities[0][0].item()
 
         return (
-            score >= CLASSIFICATION_THRESHOLD,
+            score >= GATE_THRESHOLD,
             score
         )
