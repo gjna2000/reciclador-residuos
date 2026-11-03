@@ -11,15 +11,34 @@ from .models.waste_classifier import WasteClassifier
 
 
 class RecyclingPipeline:
+
+    # Instancias reutilizables del pipeline
+_pipelines = {}
+
+
+def analyze(image: Image.Image, device: str | None = None) -> AnalysisResult:
+    """
+    Analiza una imagen utilizando el pipeline principal.
+    """
+
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    if device not in _pipelines:
+        _pipelines[device] = RecyclingPipeline(device=device)
+
+    return _pipelines[device].analyze(image)
     """
     Pipeline principal para analizar imágenes de residuos.
 
     Carga los modelos una sola vez y coordina
     la validación, clasificación y recomendación.
     """
+def __init__(self, device: str | None = None):
+        if device is None:
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    def __init__(self, device: str = "cuda"):
-        self.device = torch.device(device)
+self.device = torch.device(device)
 
         # Este proyecto está configurado para trabajar con CUDA.
         if self.device.type == "cuda" and not torch.cuda.is_available():
