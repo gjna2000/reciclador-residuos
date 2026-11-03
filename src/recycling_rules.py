@@ -43,11 +43,11 @@ RECYCLING_RULES = {
         "tip": "Lleva las baterías a un punto de recolección posconsumo."
     },
     "Clothes": {
-        "bin": "Donation or textile collection",
+        "bin": "punto-especial",
         "tip": "Si está en buen estado, considera reutilizarlo o donarlo."
     },
     "Shoes": {
-        "bin": "Donation or specialized collection",
+        "bin": "punto-especial",
         "tip": "Si están en buen estado, considera reutilizarlos o donarlos."
     },
 }
