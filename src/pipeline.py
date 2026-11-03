@@ -1,5 +1,4 @@
 
-from pathlib import Path
 
 import torch
 from PIL import Image
@@ -11,61 +10,33 @@ from .models.waste_classifier import WasteClassifier
 
 
 class RecyclingPipeline:
-
-    # Instancias reutilizables del pipeline
-_pipelines = {}
-
-
-def analyze(image: Image.Image, device: str | None = None) -> AnalysisResult:
-    """
-    Analiza una imagen utilizando el pipeline principal.
-    """
-
-    if device is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    if device not in _pipelines:
-        _pipelines[device] = RecyclingPipeline(device=device)
-
-    return _pipelines[device].analyze(image)
     """
     Pipeline principal para analizar imágenes de residuos.
-
-    Carga los modelos una sola vez y coordina
-    la validación, clasificación y recomendación.
+    Carga los modelos una sola vez y coordina el análisis.
     """
-def __init__(self, device: str | None = None):
+
+    def __init__(self, device: str | None = None):
         if device is None:
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+            device = "cuda" if torch.cuda.is_available() else "cpu"
 
-self.device = torch.device(device)
+        self.device = torch.device(device)
 
-        # Este proyecto está configurado para trabajar con CUDA.
         if self.device.type == "cuda" and not torch.cuda.is_available():
-            raise RuntimeError(
-                "CUDA no está disponible. "
-                "Verifica la instalación de PyTorch y los controladores NVIDIA."
-            )
+            raise RuntimeError("CUDA no está disponible.")
 
-        # Cargar los modelos una sola vez.
         self.gate = Gate(device=str(self.device))
         self.classifier = WasteClassifier(device=str(self.device))
 
     def _prepare_image(self, image) -> Image.Image:
-        """
-        Recibe una imagen PIL, un archivo o una ruta
-        y la convierte al formato RGB.
-        """
+        """Convierte una imagen, archivo o ruta a RGB."""
 
         if image is None:
             raise ValueError("No se recibió ninguna imagen.")
 
         try:
-            # Si ya es una imagen PIL.
             if isinstance(image, Image.Image):
                 return image.convert("RGB")
 
-            # Si es un archivo o una ruta.
             if hasattr(image, "seek"):
                 image.seek(0)
 
@@ -75,13 +46,11 @@ self.device = torch.device(device)
         except Exception as error:
             raise ValueError(
                 "No fue posible abrir la imagen. "
-                "Verifica que el archivo sea una imagen válida."
+                "Verifica que sea válida."
             ) from error
 
     def analyze(self, image) -> AnalysisResult:
-        """
-        Ejecuta el pipeline completo sobre una imagen.
-        """
+        """Ejecuta el análisis completo."""
 
         prepared_image = self._prepare_image(image)
 
@@ -91,3 +60,23 @@ self.device = torch.device(device)
             classifier=self.classifier,
             device=str(self.device)
         )
+
+
+# Instancias reutilizables
+_pipelines = {}
+
+
+def analyze(
+    image: Image.Image,
+    device: str | None = None
+) -> AnalysisResult:
+    """Interfaz pública para analizar imágenes."""
+
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    if device not in _pipelines:
+        _pipelines[device] = RecyclingPipeline(device=device)
+
+    return _pipelines[device].analyze(image)
+
