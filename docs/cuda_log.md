@@ -97,6 +97,13 @@ Rótulos para el README y `docs/cuda.md`:
 
 Las entradas nuevas van arriba.
 
+### 2026-11-05 · Benchmark del pipeline completo (línea base)
+
+- Qué se hizo: se creó `benchmarks/pipeline_cpu_vs_gpu.py` y se midió el pipeline completo (filtro CLIP + clasificador ViT) en CPU y GPU con `large_bottle.jpg` (1200 × 1200 px), 30 repeticiones y 5 de calentamiento, en fp32.
+- Resultado: total CPU 328,09 ms y GPU 73,52 ms (4,5 veces más rápida). Filtro: 130,41 ms contra 38,59 ms (3,4 veces). Clasificador: 196,14 ms contra 34,18 ms (5,7 veces). Mismo estado (`reciclable`) y misma clase (`Plastic`) en ambos dispositivos. `wall_ms` (73,60) coincide con `total_ms` (73,52), así que no hay tiempo relevante fuera de las etapas medidas.
+- Decisión tomada: se descarta la primera ejecución (CPU 411,50 ms, GPU 83,47 ms) porque los modelos se descargaban en segundo plano durante la medición. Se toma la segunda como referencia.
+- Pendiente: capturas de `nvidia-smi` con el pipeline completo; comprobar si el preprocesado en CPU del filtro explica su variabilidad en GPU; repetir la medición después de añadir el preprocesado.
+
 ### 2026-11-02 · Segunda ronda de pruebas con una imagen más grande
 
 - Se repitió el benchmark con `large_bottle.jpg` (1200 × 1200 px) y se tomaron las capturas de nuevo.
@@ -139,9 +146,18 @@ Las entradas nuevas van arriba.
 
 - [x] Hacer push de `docs/evidence/` y de este registro
 - [x] Repetir el benchmark con una imagen más grande
-- [ ] Medir las etapas del pipeline real (filtro, clasificación, total) cuando Javier tenga `pipeline.analyze`
+- [x] Medir las etapas del pipeline real (filtro, clasificación, total) cuando Javier tenga `pipeline.analyze`
 - [ ] Escribir `docs/cuda.md` con nuestras palabras: qué corre en el host, qué en el device y cómo viajan los datos (fecha límite: sábado 7 de noviembre)
 - [ ] Preparar la explicación para la sustentación: 2 minutos sobre CUDA y la comparación CPU contra GPU
+- [ ] Tomar las capturas del pipeline completo (tabla de la segunda ejecución y `nvidia-smi` con `--runs 300 --gpu-only`) y guardarlas en `docs/evidence/` con el prefijo `pipeline_`
+- [ ] Probar la hipótesis del preprocesado en CPU del filtro con la imagen reducida a 448 × 448 y registrar el resultado
+- [ ] Añadir la tabla del pipeline completo a `docs/cuda.md`
+- [ ] Preprocesado (sugerencia del profesor): crear `src/preprocess.py` y comparar con y sin él sobre las fotos propias de Aura
+- [ ] Fiabilidad con campana de Gauss (sugerencia del profesor): apoyar a Aura con el puntaje z sobre los logits
+- [ ] Modelo de lenguaje con prompt maestro (sugerencia del profesor): confirmar el modelo con el equipo y medir la memoria de la GPU de cada modelo (ViT, CLIP y LLM) para decidir entre fp16, cuantización o CPU
+- [ ] Acordar con Javier el cambio del contrato (campos opcionales en `AnalysisResult`) y las claves de `timings_ms`
+- [ ] Repetir el benchmark del pipeline completo después de añadir el preprocesado y el modelo de lenguaje
+- [ ] Probar el plan B en Colab o Kaggle antes de la sustentación
 
 ---
 
