@@ -70,6 +70,7 @@ El aumento de memoria es coherente con el tamaño del modelo: 85,8 millones de p
 | 2026-11-01 | El dispositivo se elige solo en `src/device.py`; el resto del código lo recibe como parámetro | Evita escribir `"cuda"` a mano en varios archivos y facilita pasar a CPU en otra máquina |
 | 2026-11-01 | Se prueba fp16 y se documenta su descarte | La rúbrica pide declarar los ajustes hechos y explicar los que no se aplicaron |
 | 2026-11-02 | Los nombres de carpetas y archivos van en inglés (`docs/evidence/`) | Consistencia con el resto del repositorio |
+| 2026-11-06 | No se añade preprocesado de imagen al pipeline | Dos variantes (recorte + JPEG, y ajuste con relleno gris) dieron peores resultados que la imagen original en 25 fotos; el procesador del modelo ya redimensiona y normaliza |
 
 ---
 
@@ -96,6 +97,14 @@ Rótulos para el README y `docs/cuda.md`:
 ## 5. Bitácora
 
 Las entradas nuevas van arriba.
+
+### 2026-11-06 · Pruebas de preprocesado (sugerencia del profesor)
+
+- Qué se hizo: se probaron dos preprocesados antes del pipeline sobre 25 fotos propias. `preprocessing.py` recortaba la imagen a un cuadrado de 224 × 224 con `ImageOps.fit` y la recodificaba como JPEG con calidad 85. `preprocessing_v2.py` ajustaba la imagen completa dentro de un cuadrado de 224 × 224 conservando la proporción, rellenando con gris neutro, sin recortar ni comprimir.
+- Resultado: en estas 25 fotos, la imagen original dio mejores resultados que las dos variantes (aciertos: original __ de 25, v1 __ de 25, v2 __ de 25).
+- Hallazgo: según la configuración del procesador del modelo, este ya redimensiona a 224 × 224 (bilinear) y normaliza con media 0,5 y desviación 0,5 por canal, sin recorte central ni recodificación. Las variantes añadían transformaciones que no forman parte de la receta del modelo.
+- Decisión tomada: no se añade preprocesado al pipeline.
+- Pendiente: verificar la configuración imprimiendo el procesador; documentar este resultado en `docs/cuda.md` y en la ficha del modelo.
 
 ### 2026-11-05 · Benchmark del pipeline completo (línea base)
 
@@ -147,16 +156,16 @@ Las entradas nuevas van arriba.
 - [x] Hacer push de `docs/evidence/` y de este registro
 - [x] Repetir el benchmark con una imagen más grande
 - [x] Medir las etapas del pipeline real (filtro, clasificación, total) cuando Javier tenga `pipeline.analyze`
-- [ ] Escribir `docs/cuda.md` con nuestras palabras: qué corre en el host, qué en el device y cómo viajan los datos (fecha límite: sábado 7 de noviembre)
+- [x] Escribir `docs/cuda.md` con nuestras palabras: qué corre en el host, qué en el device y cómo viajan los datos (fecha límite: sábado 7 de noviembre)
 - [ ] Preparar la explicación para la sustentación: 2 minutos sobre CUDA y la comparación CPU contra GPU
-- [ ] Tomar las capturas del pipeline completo (tabla de la segunda ejecución y `nvidia-smi` con `--runs 300 --gpu-only`) y guardarlas en `docs/evidence/` con el prefijo `pipeline_`
+- [x] Tomar las capturas del pipeline completo (tabla de la segunda ejecución y `nvidia-smi` con `--runs 300 --gpu-only`) y guardarlas en `docs/evidence/` con el prefijo `pipeline_`
 - [ ] Probar la hipótesis del preprocesado en CPU del filtro con la imagen reducida a 448 × 448 y registrar el resultado
 - [ ] Añadir la tabla del pipeline completo a `docs/cuda.md`
-- [ ] Preprocesado (sugerencia del profesor): crear `src/preprocess.py` y comparar con y sin él sobre las fotos propias de Aura
-- [ ] Fiabilidad con campana de Gauss (sugerencia del profesor): apoyar a Aura con el puntaje z sobre los logits
-- [ ] Modelo de lenguaje con prompt maestro (sugerencia del profesor): confirmar el modelo con el equipo y medir la memoria de la GPU de cada modelo (ViT, CLIP y LLM) para decidir entre fp16, cuantización o CPU
+- [x] Preprocesado (sugerencia del profesor): crear `src/preprocess.py` y comparar con y sin él sobre las fotos propias de Aura
+- [x] Fiabilidad con campana de Gauss (sugerencia del profesor): apoyar a Aura con el puntaje z sobre los logits (descartado por decicion popular)
+- [x] Modelo de lenguaje con prompt maestro (sugerencia del profesor): confirmar el modelo con el equipo y medir la memoria de la GPU de cada modelo (ViT, CLIP y LLM) para decidir entre fp16, cuantización o CPU (descartado por decicion popular)
 - [ ] Acordar con Javier el cambio del contrato (campos opcionales en `AnalysisResult`) y las claves de `timings_ms`
-- [ ] Repetir el benchmark del pipeline completo después de añadir el preprocesado y el modelo de lenguaje
+- [x] Repetir el benchmark del pipeline completo después de añadir el preprocesado y el modelo de lenguaje(descartado por decicion popular, viva la democracia :D)
 - [ ] Probar el plan B en Colab o Kaggle antes de la sustentación
 
 ---
