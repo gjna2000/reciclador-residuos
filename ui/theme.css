@@ -8,7 +8,6 @@
     --lime-bright: #A3E635;
     --amber: #F59E0B;
     --gold: #EAB308;
-    /* Fondo blanco verdoso natural y suave */
     --surface: #EAF3ED;
     --surface-soft: #F4F9F6;
     --surface-inset: #E8F1EB;
@@ -22,15 +21,6 @@
     --font-body: 'Inter', sans-serif;
     --font-headline: 'Manrope', 'Inter', sans-serif;
 }
-
-
-/* ------------------------------------------------------------------ */
-
-
-/* Base y fondo                                                        */
-
-
-/* ------------------------------------------------------------------ */
 
 .stApp {
     background: radial-gradient(900px 420px at 90% -6%, rgba(163, 230, 53, 0.16), transparent 62%), radial-gradient(800px 520px at -6% 18%, rgba(22, 163, 74, 0.08), transparent 62%), linear-gradient(180deg, #E7F1EA 0%, #EDF5EF 42%, #E4EEE7 100%);
@@ -80,15 +70,6 @@ footer {
 .eco-num {
     font-variant-numeric: tabular-nums;
 }
-
-
-/* ------------------------------------------------------------------ */
-
-
-/* Header fijo                                                         */
-
-
-/* ------------------------------------------------------------------ */
 
 .eco-header {
     position: fixed;
@@ -296,15 +277,6 @@ footer {
     }
 }
 
-
-/* ------------------------------------------------------------------ */
-
-
-/* Hero y pasos                                                        */
-
-
-/* ------------------------------------------------------------------ */
-
 .eco-hero {
     padding: 0.25rem 0 0.5rem;
 }
@@ -435,15 +407,6 @@ footer {
     }
 }
 
-
-/* ------------------------------------------------------------------ */
-
-
-/* Títulos de sección y estados vacíos                                 */
-
-
-/* ------------------------------------------------------------------ */
-
 .eco-section {
     margin: 2.25rem 0 0.4rem;
     display: flex;
@@ -547,15 +510,6 @@ footer {
     white-space: nowrap;
 }
 
-
-/* ------------------------------------------------------------------ */
-
-
-/* Paneles (tarjeta de carga y de resultado)                           */
-
-
-/* ------------------------------------------------------------------ */
-
 .st-key-upload_card,
 [class*="st-key-result_card"] {
     background: #fff;
@@ -608,9 +562,6 @@ footer {
     color: #374151;
     border: 1px solid #D1D5DB;
 }
-
-
-/* --- Selector de modalidad (segmentado) y filtros (chips) --- */
 
 .st-key-input_mode [role="radiogroup"] {
     gap: 0.25rem;
@@ -709,9 +660,6 @@ footer {
     vertical-align: middle;
 }
 
-
-/* --- Cargador de archivos --- */
-
 .st-key-upload_card [data-testid="stFileUploaderDropzone"] {
     background: var(--surface-soft);
     border: 2px dashed #8ED0A9;
@@ -725,9 +673,6 @@ footer {
     border-color: var(--eco-green);
     background: #EEF8F2;
 }
-
-
-/* --- Contenedor de imagen de tamaño controlado (archivo) --- */
 
 .st-key-upload_card [data-testid="stImage"] {
     display: flex !important;
@@ -757,9 +702,6 @@ footer {
     margin: 0 auto !important;
 }
 
-
-/* --- Cámara: mismo límite de tamaño, sin desbordar el panel --- */
-
 .st-key-upload_card [data-testid="stCameraInput"] {
     width: 100%;
     max-width: 100%;
@@ -783,9 +725,6 @@ footer {
 .st-key-upload_card [data-testid="stCaptionContainer"] {
     font-size: 0.78rem;
 }
-
-
-/* --- Botones --- */
 
 .stApp .stButton>button {
     width: 100%;
@@ -833,15 +772,6 @@ footer {
 .stApp [data-testid="stBaseButton-secondary"]:focus-visible {
     box-shadow: 0 0 0 3px rgba(132, 204, 22, 0.45);
 }
-
-
-/* ------------------------------------------------------------------ */
-
-
-/* Tarjeta de resultado                                                */
-
-
-/* ------------------------------------------------------------------ */
 
 .eco-res-head {
     display: flex;
@@ -935,9 +865,6 @@ footer {
 .eco-toast .material-symbols-outlined {
     font-size: 16px;
 }
-
-
-/* Animación de la caneca: dos juegos de keyframes idénticos (0/1) para poder repetirla */
 
 .eco-lid {
     transform-origin: 65px 82px;
@@ -1266,15 +1193,6 @@ footer {
     background: #fff;
 }
 
-
-/* ------------------------------------------------------------------ */
-
-
-/* Catálogo de categorías                                              */
-
-
-/* ------------------------------------------------------------------ */
-
 [class*="st-key-catcard_"] {
     position: relative;
     gap: 0;
@@ -1493,9 +1411,6 @@ footer {
     color: #374151;
 }
 
-
-/* Rejilla: 6 columnas en escritorio, 3 en tablet, 2 en móvil */
-
 .st-key-cat_grid [data-testid="stHorizontalBlock"] {
     flex-wrap: wrap !important;
     gap: 0.875rem !important;
@@ -1524,9 +1439,6 @@ footer {
         max-width: calc((100% - 0.875rem) / 2) !important;
     }
 }
-
-
-/* Tarjeta de información de la categoría seleccionada */
 
 .eco-detail {
     display: grid;
@@ -1794,15 +1706,6 @@ footer {
     }
 }
 
-
-/* ------------------------------------------------------------------ */
-
-
-/* Pie de página                                                       */
-
-
-/* ------------------------------------------------------------------ */
-
 .eco-footer {
     margin-top: 3rem;
     padding: 1.5rem 0 0.5rem;
@@ -1828,26 +1731,11 @@ footer {
     flex-wrap: wrap;
 }
 
-
-/* ------------------------------------------------------------------ */
-
-
-/* Correcciones: texto recortado y espacio vacío                       */
-
-
-/* ------------------------------------------------------------------ */
-
-
-/* 1) La barra de color se ancla a la tarjeta de resultado (no al bloque de texto) */
-
 [class*="st-key-result_card"] [data-testid="stElementContainer"],
 [class*="st-key-result_card"] [data-testid="stMarkdown"],
 [class*="st-key-result_card"] [data-testid="stMarkdownContainer"] {
     position: static;
 }
-
-
-/* 2) El panel izquierdo acompaña el scroll mientras el derecho es más largo */
 
 @media (min-width: 992px) and (min-height: 720px) {
     [data-testid="stColumn"]>[data-testid="stVerticalBlock"]> :has(.st-key-upload_card) {
@@ -1856,26 +1744,11 @@ footer {
     }
 }
 
-
-/* ------------------------------------------------------------------ */
-
-
-/* Mejoras de interfaz                                                 */
-
-
-/* ------------------------------------------------------------------ */
-
-
-/* Vista previa: centrada horizontal y verticalmente en el contenedor de altura fija */
-
 .st-key-upload_card [data-testid="stElementContainer"]:has([data-testid="stImage"]),
 .st-key-upload_card [data-testid="stFullScreenFrame"],
 .st-key-upload_card [data-testid="stFullScreenFrame"]>div {
     width: 100% !important;
 }
-
-
-/* Dropzone vacío = área grande de arrastrar y soltar (con archivo cargado vuelve a ser compacto) */
 
 .st-key-upload_card [data-testid="stFileUploaderDropzone"]:has([data-testid="stFileUploaderDropzoneInstructions"]) {
     flex-direction: column;
@@ -1917,9 +1790,6 @@ footer {
     font-size: 0.78rem;
     color: var(--text-muted);
 }
-
-
-/* Resumen "¿Qué va en cada caneca?" */
 
 .eco-bins {
     display: grid;

@@ -231,11 +231,6 @@ LOGO_SVG = (
     '</svg>'
 )
 
-# ---------------------------------------------------------------------------
-# Datos de apoyo para la interfaz (no alteran las categorías ni las reglas)
-# ---------------------------------------------------------------------------
-
-# Carpeta de fotografías de categorías (ruta absoluta respecto al proyecto).
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets" / "categorias"
 IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp")
 
@@ -245,8 +240,6 @@ SHORT_CODES = {
     "Trash": "Relleno", "Battery": "Tótem", "Clothes": "Fibra", "Shoes": "Suela",
 }
 
-# Separación en la fuente en Colombia (Res. 2184): blanca, negra y verde; el resto,
-# a puntos de recolección autorizados.
 BIN_INFO = {
     "Contenedor Blanco": {"short": "Blanca", "sub": "Aprovechables limpios y secos", "group": "blanca",
                           "kind": ("Aprovechable", "ok"), "badge": "Caneca Blanca", "special": False},
@@ -315,10 +308,6 @@ def _md(text: str) -> None:
     st.markdown(_html(text), unsafe_allow_html=True)
 
 
-# ---------------------------------------------------------------------------
-# Tema e imágenes
-# ---------------------------------------------------------------------------
-
 def load_theme(path: Path = THEME_PATH) -> None:
     try:
         css = path.read_text(encoding="utf-8")
@@ -357,10 +346,6 @@ def get_local_image_base64(filepath: Path, max_px: int = 720) -> str | None:
             return _image_data_uri(str(candidate), candidate.stat().st_mtime, max_px)
     return None
 
-
-# ---------------------------------------------------------------------------
-# Estructura general: header, hero, secciones, pie
-# ---------------------------------------------------------------------------
 
 def render_header() -> None:
     _md(f"""
@@ -502,7 +487,6 @@ def result_card(result) -> None:
     pill, css = STATUS_STYLE.get(result.status, STATUS_STYLE["incierto"])
     ss = st.session_state
 
-    # Cada resultado nuevo reproduce la animación una vez (se guarda la referencia al objeto).
     if ss.get("_eco_anim_for") is not result:
         ss["_eco_anim_for"] = result
         ss["eco_anim_tick"] = ss.get("eco_anim_tick", 0) + 1
@@ -595,10 +579,6 @@ def tech_info(result) -> None:
         c2.metric("Tiempo de análisis", f"{total_time:.0f} ms")
 
 
-# ---------------------------------------------------------------------------
-# Resumen: qué va en cada caneca (usa CATEGORY_DETAILS y BIN_INFO)
-# ---------------------------------------------------------------------------
-
 def bins_overview() -> None:
     """Resumen compacto de las 3 canecas y los puntos especiales."""
     groups: dict[str, list[tuple[str, dict]]] = {}
@@ -635,10 +615,6 @@ def bins_overview() -> None:
     section_title("¿Qué va en cada caneca?", "Separación en la fuente según la Resolución 2184.", anchor="canecas")
     _md(f'<div class="eco-bins">{cards}</div>{strip}')
 
-
-# ---------------------------------------------------------------------------
-# Catálogo de categorías
-# ---------------------------------------------------------------------------
 
 def _select_category(key: str) -> None:
     st.session_state["manual_category"] = key
