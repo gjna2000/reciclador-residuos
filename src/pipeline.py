@@ -1,168 +1,231 @@
+
+from time import perf_counter
+
 import torch
 from PIL import Image
-from time import perf_counter
-from .contracts import AnalysisResult, Prediction
+
+from .contracts import AnalysisResult
+from .config import CLASSIFICATION_THRESHOLD
 from .models.gate import Gate
 from .models.gdino_detector import GDinoDetector
 from .models.waste_classifier import WasteClassifier
 from .recycling_rules import get_recycling_recommendation
-from .config import CLASSIFICATION_THRESHOLD
 
 
 class RecyclingPipeline:
     """
-    Pipeline principal para analizar imágenes de residuos.
-    Carga los modelos una sola vez y coordina la validación,
-    clasificación y recomendación.
+    Pipeline híbrido de detección y clasificación de residuos.
+
+    Grounding DINO:
+        Detecta residuos y genera cajas delimitadoras.
+
+    WasteClassifier:
+        Clasifica individualmente cada objeto detectado.
+
+    RecyclingRules:
+        Genera recomendaciones de reciclaje.
     """
+
     def __init__(self, device: str = "cuda"):
         self.device = torch.device(device)
+
         if self.device.type == "cuda" and not torch.cuda.is_available():
             raise RuntimeError(
-                "CUDA no está disponible. Verifica la instalación de PyTorch y los controladores NVIDIA."
+                "CUDA no está disponible. Verifica PyTorch y los "
+                "controladores NVIDIA."
             )
-        
-        # Cargar los modelos una sola vez
-        self.gate = Gate(device=str(self.device))
-        self.classifier = WasteClassifier(device=str(self.device))
-        self.detector = GDinoDetector()
 
-    def _prepare_image(self, image) -> Image.Image:
-        """Convierte la imagen a formato RGB de forma segura."""
+        print(f"Cargando pipeline en {self.device}...")
+
+        self.gate = Gate(device=str(self.device))
+        self.detector = GDinoDetector()
+        self.classifier = WasteClassifier(device=str(self.device))
+
+        print("Pipeline cargado correctamente.")
+
+    @staticmethod
+    def _prepare_image(image) -> Image.Image:
+        """Convierte cualquier imagen válida a RGB."""
+
         if image is None:
             raise ValueError("No se recibió ninguna imagen.")
+
         try:
             if isinstance(image, Image.Image):
                 return image.convert("RGB")
+
             if hasattr(image, "seek"):
                 image.seek(0)
+
             with Image.open(image) as opened_image:
                 return opened_image.convert("RGB")
+
         except Exception as error:
-            raise ValueError("No fue posible abrir la imagen.") from error
+            raise ValueError(
+                "No fue posible abrir la imagen."
+            ) from error
 
     def analyze(self, image) -> AnalysisResult:
-        """Ejecuta el pipeline completo de análisis de residuos."""
+        """Detecta, clasifica y recomienda sobre cada objeto."""
+
         total_start = perf_counter()
         timings = {}
-        
+
         prepared_image = self._prepare_image(image)
 
-        # 1. Filtro general (Gate CLIP)
+        # 1. Gate CLIP: información auxiliar, no bloquea DINO.
         start = perf_counter()
-        is_waste, gate_score = self.gate.is_waste(prepared_image)
-        timings["gate_ms"] = (perf_counter() - start) * 1000
 
-        if not is_waste:
-            timings["total_ms"] = (perf_counter() - total_start) * 1000
+        try:
+            is_waste, gate_score = self.gate.is_waste(
+                prepared_image
+            )
+        except Exception:
+            is_waste = None
+            gate_score = None
+
+        timings["gate_ms"] = (
+            perf_counter() - start
+        ) * 1000
+
+        # 2. Detectar objetos con Grounding DINO.
+        start = perf_counter()
+
+        detections = self.detector.detect(
+            prepared_image
+        )
+
+        timings["detection_ms"] = (
+            perf_counter() - start
+        ) * 1000
+
+        # 3. Si no hay detecciones, devolver resultado.
+        if not detections:
+            timings["total_ms"] = (
+                perf_counter() - total_start
+            ) * 1000
+
             return AnalysisResult(
                 status="no_es_residuo",
                 top=[],
                 bin=None,
-                tip="La imagen no parece contener un residuo o no es un objeto válido. Intenta con otra fotografía.",
+                tip="No se detectaron residuos. "
+                    "Intenta con otra fotografía.",
                 device=str(self.device),
-                timings_ms=timings
+                timings_ms=timings,
+                objects=[]
             )
 
-        
-# 2. Detectar objetos con Grounding DINO
-start = perf_counter()
-detections = self.detector.detect(prepared_image)
-timings["detection_ms"] = (perf_counter() - start) * 1000
+        # 4. Clasificar individualmente cada objeto.
+        object_results = []
+        predictions = []
 
-if not detections:
-    timings["total_ms"] = (perf_counter() - total_start) * 1000
+        classifier_start = perf_counter()
 
-    return AnalysisResult(
-        status="no_es_residuo",
-        top=[],
-        bin=None,
-        tip="No se detectaron residuos en la imagen.",
-        device=str(self.device),
-        timings_ms=timings
-    )
+        image_width, image_height = prepared_image.size
 
-# 3. Clasificar individualmente cada objeto
-start = perf_counter()
+        for detection in detections:
 
-predictions = []
-object_results = []
+            xmin, ymin, xmax, ymax = detection["box"]
 
-for detection in detections:
+            # Validar y limitar las coordenadas.
+            xmin = max(0, min(image_width, int(xmin)))
+            ymin = max(0, min(image_height, int(ymin)))
+            xmax = max(0, min(image_width, int(xmax)))
+            ymax = max(0, min(image_height, int(ymax)))
 
-    xmin, ymin, xmax, ymax = detection["box"]
+            if xmax <= xmin or ymax <= ymin:
+                continue
 
-    # Recortar objeto detectado
-    crop = prepared_image.crop(
-        (xmin, ymin, xmax, ymax)
-    )
+            # Recortar el objeto.
+            crop = prepared_image.crop(
+                (xmin, ymin, xmax, ymax)
+            )
 
-    # Clasificar el recorte
-    crop_predictions = self.classifier.classify(crop)
+            # Clasificar el recorte.
+            crop_predictions = self.classifier.classify(
+                crop
+            )
 
-    if not crop_predictions:
-        continue
+            if not crop_predictions:
+                continue
 
-    best_pred = crop_predictions[0]
+            best_pred = crop_predictions[0]
 
-    # Obtener recomendación de reciclaje
-    recommendation = get_recycling_recommendation(
-        best_pred.label
-    )
+            # Evaluar confianza.
+            confident = (
+                best_pred.score >= CLASSIFICATION_THRESHOLD
+            )
 
-    # Guardar resultado individual
-    object_results.append({
-        "detected_label": detection["label"],
-        "detection_score": detection["score"],
-        "box": detection["box"],
-        "classification": best_pred.label,
-        "classification_score": best_pred.score,
-        "bin": recommendation["bin"],
-        "tip": recommendation["tip"]
-    })
-
-    predictions.append(best_pred)
-
-timings["classifier_ms"] = (perf_counter() - start) * 1000
-
-# 4. Construir resultado general
-if object_results:
-    first_object = object_results[0]
-
-    waste_bin = first_object["bin"]
-    tip = first_object["tip"]
-    status = "reciclable"
-else:
-    waste_bin = None
-    tip = "No fue posible clasificar los objetos detectados."
-    status = "incierto"
-
-                return AnalysisResult(
-                    status="incierto",
-                    top=predictions,
-                    bin=None,
-                    tip="El sistema no tiene suficiente confianza en el resultado. Toma otra fotografía con mejor iluminación.",
-                    device=str(self.device),
-                    timings_ms=timings
+            # Aplicar reglas únicamente a predicciones confiables.
+            if confident:
+                recommendation = get_recycling_recommendation(
+                    best_pred.label
                 )
 
-            recommendation = get_recycling_recommendation(best_pred.label)
+                waste_bin = recommendation["bin"]
+                tip = recommendation["tip"]
+
+                predictions.append(best_pred)
+
+            else:
+                waste_bin = None
+                tip = (
+                    "Clasificación incierta. "
+                    "Intenta tomar otra fotografía."
+                )
+
+            # Registrar información individual.
+            object_results.append({
+                "detected_label": detection["label"],
+                "detection_score": float(detection["score"]),
+                "box": [xmin, ymin, xmax, ymax],
+                "classification": best_pred.label,
+                "classification_score": float(best_pred.score),
+                "bin": waste_bin,
+                "tip": tip,
+                "confident": confident
+            })
+
+        timings["classifier_ms"] = (
+            perf_counter() - classifier_start
+        ) * 1000
+
+        # 5. Construir resultado general.
+        if predictions:
+
+            best_pred = max(
+                predictions,
+                key=lambda prediction: prediction.score
+            )
+
+            recommendation = get_recycling_recommendation(
+                best_pred.label
+            )
+
+            status = "reciclable"
             waste_bin = recommendation["bin"]
             tip = recommendation["tip"]
-            status = "reciclable"
-        else:
-            waste_bin = None
-            tip = "No fue posible identificar el residuo."
-            status = "incierto"
 
-        timings["total_ms"] = (perf_counter() - total_start) * 1000
+        else:
+            status = "incierto"
+            waste_bin = None
+            tip = (
+                "Se detectaron objetos, pero no fue posible "
+                "clasificarlos con suficiente confianza."
+            )
+
+        # 6. Finalizar análisis.
+        timings["total_ms"] = (
+            perf_counter() - total_start
+        ) * 1000
+
         return AnalysisResult(
             status=status,
             top=predictions,
             bin=waste_bin,
             tip=tip,
             device=str(self.device),
-            timings_ms=timings
+            timings_ms=timings,
             objects=object_results
         )
-
