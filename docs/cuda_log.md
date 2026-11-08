@@ -70,7 +70,10 @@ El aumento de memoria es coherente con el tamaño del modelo: 85,8 millones de p
 | 2026-11-01 | El dispositivo se elige solo en `src/device.py`; el resto del código lo recibe como parámetro | Evita escribir `"cuda"` a mano en varios archivos y facilita pasar a CPU en otra máquina |
 | 2026-11-01 | Se prueba fp16 y se documenta su descarte | La rúbrica pide declarar los ajustes hechos y explicar los que no se aplicaron |
 | 2026-11-02 | Los nombres de carpetas y archivos van en inglés (`docs/evidence/`) | Consistencia con el resto del repositorio |
-| 2026-11-06 | No se añade preprocesado de imagen al pipeline | Dos variantes (recorte + JPEG, y ajuste con relleno gris) dieron peores resultados que la imagen original en 25 fotos; el procesador del modelo ya redimensiona y normaliza |
+| 2026-11-06 | No se añade preprocesado de imagen al pipeline | La revisión visual encontró resultados de clasificación menos confiables en las variantes de recorte + JPEG y letterbox, aunque sus tiempos totales fueron menores; el procesador del modelo ya redimensiona y normaliza |
+| 2026-11-07 | Se descarta el detector YOLO estándar integrado como detector intermedio | En la prueba de la cáscara con el sachet no detectó el sachet y su modelo `yolo26n.pt` usa un vocabulario fijo; se buscó un detector abierto para encontrar objetos fuera de sus clases |
+| 2026-11-07 | Se adopta Grounding DINO tiny como detector, con la configuración 3 (umbral 0,20; NMS global con IoU 0,5; máximo 4 detecciones; descarta cajas de más del 70 % de la imagen) | Dio los resultados visuales más limpios y menos falsos positivos en las imágenes de prueba; es una selección por inspección visual, no una calibración probabilística |
+| 2026-11-07 | Se descartan la fiabilidad con campana de Gauss y el modelo de lenguaje con prompt maestro | Decisión del equipo por votación |
 
 ---
 
@@ -84,9 +87,6 @@ Todos en `docs/evidence/`.
 | `gpu_fp32_vs_fp16.png` | Corrida solo en GPU con 500 repeticiones, que respalda el descarte de fp16 |
 | `nvidia_smi_idle.png` | `nvidia-smi` con la GPU en reposo |
 | `nvidia_smi_inference.png` | `nvidia-smi` durante la inferencia: 97 % de utilización y más memoria |
-| 2026-11-07 | Se descarta YOLO del pipeline | Falló en la prueba (no detectó el sachet) y su vocabulario es cerrado (clases de COCO); se necesita detectar objetos sin importar su clase para recortar la imagen |
-| 2026-11-07 | Se adopta Grounding DINO tiny como detector, con la configuración 3 (umbral 0,20; NMS global con IoU 0,5; máximo 4 detecciones; descarta cajas de más del 70 % de la imagen) | Dio los resultados visuales más limpios y menos falsos positivos en las imágenes de prueba; es una selección por inspección visual, no una calibración probabilística |
-| 2026-11-07 | Se descartan la fiabilidad con campana de Gauss y el modelo de lenguaje con prompt maestro | Decisión del equipo por votación |
 
 Rótulos para el README y `docs/cuda.md`:
 
@@ -101,9 +101,9 @@ Rótulos para el README y `docs/cuda.md`:
 
 Las entradas nuevas van arriba.
 
-### 2026-11-07 · Reemplazo de YOLO por Grounding DINO y selección de configuración
+### 2026-11-07 · Sustitución del YOLO estándar por Grounding DINO y selección de configuración
 
-- Qué se hizo: tras descartar YOLO (no detectó el sachet y su vocabulario es cerrado), se probaron detectores de vocabulario abierto para recortar objetos sin importar su clase. Se eligió Grounding DINO (`IDEA-Research/grounding-dino-tiny`, Apache 2.0) y se probaron tres configuraciones de umbral (0,05; 0,10 y 0,20) con `benchmarks/gdino_calibration_v2.py`. La versión 1 aplicaba NMS por etiqueta y dejaba duplicados de la misma región; la versión 2 aplica NMS global, sin separar por etiqueta.
+- Qué se hizo: el detector YOLO estándar integrado (`yolo26n.pt`, de vocabulario fijo) no encontró el sachet en la imagen con la cáscara de plátano. Se probaron detectores de vocabulario abierto para proponer recortes sin depender de una lista fija de clases. Se eligió Grounding DINO (`IDEA-Research/grounding-dino-tiny`, Apache 2.0) y se probaron tres configuraciones de umbral (0,05; 0,10 y 0,20) con `benchmarks/gdino_calibration_v2.py`. La versión 1 aplicaba NMS por etiqueta y dejaba duplicados de la misma región; la versión 2 aplica NMS global, sin separar por etiqueta. El descarte del YOLO estándar no implica descartar YOLO-World, que se probó por separado.
 - Resultado: se seleccionó la configuración 3: umbral 0,20; NMS global con IoU de 0,5; se descartan cajas vacías y cajas que cubren más del 70 % de la imagen; máximo 4 detecciones por imagen; ejecución en GPU. En `babana_coffee_sachet_1.jpg` detectó dos objetos y los clasificó correctamente; en `babana_coffee_sachet_2.jpg` mantuvo las detecciones de la cáscara y el sachet (la configuración 2 añadía un detalle impreso del empaque y un empaque adicional); en `plastic_bag.jpg` detectó la bolsa y evitó cajas dudosas sobre el escritorio y la hoja. También se probó con `exit_mf.jpeg`, `kitchen.jpg`, `disassembled_motorcycle.jpg`, `chair_pants.jpg` y una imagen borrosa.
 - Decisión tomada: se adopta la configuración 3. Es una selección operativa basada en inspección visual, no una calibración probabilística de los puntajes. Un umbral de 0,20 puede descartar objetos reales con puntajes menores; si aparece un caso así, se registra y se reevalúa.
 - Pendiente: medir el tiempo y la memoria de la etapa de detección en CPU y GPU; integrar el detector en el pipeline con Javier.
@@ -117,7 +117,8 @@ Las entradas nuevas van arriba.
 ### 2026-11-06 · Pruebas de preprocesado (sugerencia del profesor)
 
 - Qué se hizo: se probaron dos preprocesados antes del pipeline sobre 25 fotos propias. `preprocessing.py` recortaba la imagen a un cuadrado de 224 × 224 con `ImageOps.fit` y la recodificaba como JPEG con calidad 85. `preprocessing_v2.py` ajustaba la imagen completa dentro de un cuadrado de 224 × 224 conservando la proporción, rellenando con gris neutro, sin recortar ni comprimir.
-- Resultado: en estas 25 fotos, la imagen original dio mejores resultados que las dos variantes (aciertos: original __ de 25, v1 __ de 25, v2 __ de 25).
+- Resultado: no se proporcionaron etiquetas reales para las 25 fotos, por lo que no se puede calcular una cantidad objetiva de aciertos. La v1 coincidió con la salida original (estado, clase y bote) en 11 de 25 fotos. La v2 coincidió en clase y bote en 16 de 25; el CSV no contiene etiquetas reales. En la revisión visual se consideró más confiable la salida original.
+- Tiempos promedio registrados: v1, original 165,69 ms y preprocesada total 129,66 ms (36,04 ms menos); v2, original 166,80 ms y letterbox total 120,29 ms (46,50 ms menos). Aunque las variantes redujeron el tiempo total medido, los cambios de clasificación no justificaron añadirlas al pipeline.
 - Hallazgo: según la configuración del procesador del modelo, este ya redimensiona a 224 × 224 (bilinear) y normaliza con media 0,5 y desviación 0,5 por canal, sin recorte central ni recodificación. Las variantes añadían transformaciones que no forman parte de la receta del modelo.
 - Decisión tomada: no se añade preprocesado al pipeline.
 - Pendiente: verificar la configuración imprimiendo el procesador; documentar este resultado en `docs/cuda.md` y en la ficha del modelo.
