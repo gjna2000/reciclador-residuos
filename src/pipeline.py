@@ -159,14 +159,29 @@ class RecyclingPipeline:
 
             # Aplicar reglas únicamente a predicciones confiables.
             if confident:
-                recommendation = get_recycling_recommendation(
-                    best_pred.label
-                )
+    recommendation = get_recycling_recommendation(
+        best_pred.label
+    )
 
-                waste_bin = recommendation["bin"]
-                tip = recommendation["tip"]
+    if recommendation["bin"] is not None:
+        waste_bin = recommendation["bin"]
+        tip = recommendation["tip"]
+        predictions.append(best_pred)
 
-                predictions.append(best_pred)
+    else:
+        confident = False
+        waste_bin = None
+        tip = (
+            "No existe una regla de reciclaje "
+            "configurada para esta clasificación."
+        )
+
+else:
+    waste_bin = None
+    tip = (
+        "Clasificación incierta. "
+        "Intenta tomar otra fotografía."
+    )
 
             else:
                 waste_bin = None
