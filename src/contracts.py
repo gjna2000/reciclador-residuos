@@ -15,3 +15,4 @@ class AnalysisResult:
     tip: str
     device: str
     timings_ms: dict[str, float]
+    objects: list[dict] = field(default_factory=list)
