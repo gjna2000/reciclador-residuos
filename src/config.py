@@ -11,6 +11,17 @@ GDINO_NMS_IOU = 0.50
 
 GDINO_TOP_N = 4
 
+GDINO_LABELS = [
+    "trash",
+    "waste",
+    "packaging",
+    "wrapper",
+    "peel",
+    "bottle",
+    "can",
+]
+
+
 GDINO_LABELS_ES = [
     "basura",
     "residuo",
