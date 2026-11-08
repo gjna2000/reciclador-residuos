@@ -158,30 +158,24 @@ class RecyclingPipeline:
             )
 
             # Aplicar reglas únicamente a predicciones confiables.
+                        # Aplicar reglas únicamente a predicciones confiables.
             if confident:
-    recommendation = get_recycling_recommendation(
-        best_pred.label
-    )
+                recommendation = get_recycling_recommendation(
+                    best_pred.label
+                )
 
-    if recommendation["bin"] is not None:
-        waste_bin = recommendation["bin"]
-        tip = recommendation["tip"]
-        predictions.append(best_pred)
+                if recommendation["bin"] is not None:
+                    waste_bin = recommendation["bin"]
+                    tip = recommendation["tip"]
+                    predictions.append(best_pred)
 
-    else:
-        confident = False
-        waste_bin = None
-        tip = (
-            "No existe una regla de reciclaje "
-            "configurada para esta clasificación."
-        )
-
-else:
-    waste_bin = None
-    tip = (
-        "Clasificación incierta. "
-        "Intenta tomar otra fotografía."
-    )
+                else:
+                    confident = False
+                    waste_bin = None
+                    tip = (
+                        "No existe una regla de reciclaje "
+                        "configurada para esta clasificación."
+                    )
 
             else:
                 waste_bin = None
@@ -189,46 +183,6 @@ else:
                     "Clasificación incierta. "
                     "Intenta tomar otra fotografía."
                 )
-
-            # Registrar información individual.
-            object_results.append({
-                "detected_label": detection["label"],
-                "detection_score": float(detection["score"]),
-                "box": [xmin, ymin, xmax, ymax],
-                "classification": best_pred.label,
-                "classification_score": float(best_pred.score),
-                "bin": waste_bin,
-                "tip": tip,
-                "confident": confident
-            })
-
-        timings["classifier_ms"] = (
-            perf_counter() - classifier_start
-        ) * 1000
-
-        # 5. Construir resultado general.
-        if predictions:
-
-            best_pred = max(
-                predictions,
-                key=lambda prediction: prediction.score
-            )
-
-            recommendation = get_recycling_recommendation(
-                best_pred.label
-            )
-
-            status = "reciclable"
-            waste_bin = recommendation["bin"]
-            tip = recommendation["tip"]
-
-        else:
-            status = "incierto"
-            waste_bin = None
-            tip = (
-                "Se detectaron objetos, pero no fue posible "
-                "clasificarlos con suficiente confianza."
-            )
 
         # 6. Finalizar análisis.
         timings["total_ms"] = (
