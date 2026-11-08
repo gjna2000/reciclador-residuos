@@ -1,11 +1,7 @@
 """Pipeline principal de análisis de residuos.
 
-Flujo de una imagen:
-    1. Filtro general (Gate): ¿la imagen contiene un residuo?
-    2. Detector YOLO (opcional): encuentra objetos y sus cajas.
-    3. Clasificador de residuos: clasifica cada recorte (o la imagen completa
-       si YOLO no encuentra nada útil).
-    4. Reglas de reciclaje: contenedor y consejo.
+analyze(image)       -> AnalysisResult (contrato de contracts.py, sin cambios)
+analyze_live(image)  -> LiveResult (detección YOLO con cajas, para la cámara)
 
 El dispositivo (cuda o cpu) se elige solo en device.py.
 """
@@ -16,7 +12,8 @@ from time import perf_counter
 from PIL import Image
 
 from .config import CLASSIFICATION_THRESHOLD
-from .contracts import AnalysisResult, DetectedObject
+from .contracts import AnalysisResult
+from .detection import DetectedObject, LiveResult
 from .device import get_device, sync
 from .models.gate import Gate
 from .models.waste_classifier import WasteClassifier
@@ -47,30 +44,39 @@ class RecyclingPipeline:
         self.gate = Gate(device=self.device)
         self.classifier = WasteClassifier(device=self.device)
 
-        # Importación diferida: si ultralytics no está instalado,
-        # el resto del pipeline sigue funcionando con use_detector=False.
+        # Importación diferida: sin ultralytics el resto sigue funcionando.
         self.detector = None
         if use_detector:
-            from .models.yolo_detector import YOLODetector
+            try:
+                from .models.yolo_detector import YOLODetector
 
-            self.detector = YOLODetector(device=self.device)
+                self.detector = YOLODetector(device=self.device)
+            except ImportError:
+                # Sin ultralytics o sin yolo_detector.py solo funciona analyze().
+                self.detector = None
 
-        # Los modelos se comparten; evita dos análisis simultáneos
-        # (por ejemplo, con video en tiempo real).
+        # Los modelos se comparten; evita análisis simultáneos (video en vivo).
         self._lock = Lock()
 
     # ------------------------------------------------------------------
     # API pública
     # ------------------------------------------------------------------
-    def analyze(self, image, detect: bool = True) -> AnalysisResult:
-        """Ejecuta el análisis completo sobre una imagen."""
+    def analyze(self, image) -> AnalysisResult:
+        """Análisis de una imagen completa (contrato original)."""
         with self._lock:
-            return self._analyze(image, detect)
+            return self._analyze(image)
+
+    def analyze_live(self, image) -> LiveResult:
+        """Detecta objetos con YOLO y clasifica cada uno (para la cámara)."""
+        if self.detector is None:
+            raise RuntimeError("El detector YOLO está desactivado.")
+        with self._lock:
+            return self._analyze_live(image)
 
     # ------------------------------------------------------------------
-    # Lógica interna
+    # analyze: igual que antes, con device.py y tiempos sincronizados
     # ------------------------------------------------------------------
-    def _analyze(self, image, detect: bool) -> AnalysisResult:
+    def _analyze(self, image) -> AnalysisResult:
         total_start = perf_counter()
         timings: dict[str, float] = {}
 
@@ -82,89 +88,98 @@ class RecyclingPipeline:
         )
         if not is_waste:
             return self._build(
-                "no_es_residuo", [], None, TIP_NO_RESIDUO, [], timings, total_start
+                "no_es_residuo", [], None, TIP_NO_RESIDUO, timings, total_start
             )
 
-        # 2 y 3. Detección y clasificación por objeto
-        object_results = []
-        if detect and self.detector is not None:
-            detections = self._run(
-                timings, "detector_ms", self.detector.detect, prepared
-            )
-            object_results = self._classify_detections(
-                prepared, detections, timings
-            )
-
-        objects = [obj for obj, _ in object_results]
-
-        # Resultado principal: el objeto clasificado con mayor confianza
-        confident = [
-            (obj, preds)
-            for obj, preds in object_results
-            if obj.recycling_bin is not None
-        ]
-        if confident:
-            obj, preds = max(confident, key=lambda t: t[0].classification.score)
-            return self._build(
-                "reciclable",
-                preds,
-                obj.recycling_bin,
-                obj.recycling_tip,
-                objects,
-                timings,
-                total_start,
-            )
-
-        # Respaldo: clasificar la imagen completa (YOLO no detectó nada útil)
+        # 2. Clasificador de residuos
         predictions = self._run(
             timings, "classifier_ms", self.classifier.classify, prepared
         )
-        if predictions and predictions[0].score >= CLASSIFICATION_THRESHOLD:
-            rec = get_recycling_recommendation(predictions[0].label)
+
+        # 3. Umbral de confianza y reglas de reciclaje
+        if not predictions:
             return self._build(
-                "reciclable",
-                predictions,
-                rec["bin"],
-                rec["tip"],
-                objects,
-                timings,
-                total_start,
+                "incierto", predictions, None, TIP_SIN_RESULTADO, timings, total_start
             )
 
-        tip = TIP_INCIERTO if predictions else TIP_SIN_RESULTADO
+        if predictions[0].score < CLASSIFICATION_THRESHOLD:
+            return self._build(
+                "incierto", predictions, None, TIP_INCIERTO, timings, total_start
+            )
+
+        rec = get_recycling_recommendation(predictions[0].label)
         return self._build(
-            "incierto", predictions, None, tip, objects, timings, total_start
+            "reciclable", predictions, rec["bin"], rec["tip"], timings, total_start
         )
 
+    # ------------------------------------------------------------------
+    # analyze_live: YOLO + clasificación por objeto
+    # ------------------------------------------------------------------
+    def _analyze_live(self, image) -> LiveResult:
+        total_start = perf_counter()
+        timings: dict[str, float] = {}
+
+        prepared = self._prepare_image(image)
+
+        is_waste, _gate_score = self._run(
+            timings, "gate_ms", self.gate.is_waste, prepared
+        )
+        if not is_waste:
+            return self._live("no_es_residuo", [], total_start)
+
+        detections = self._run(timings, "detector_ms", self.detector.detect, prepared)
+        objects = self._classify_detections(prepared, detections, timings)
+
+        # Respaldo: si YOLO no encontró nada útil, clasifica la imagen completa
+        if not any(obj.recycling_bin for obj in objects):
+            full = self._classify_full_image(prepared, timings)
+            if full is not None:
+                objects.append(full)
+
+        status = "reciclable" if any(o.recycling_bin for o in objects) else "incierto"
+        return self._live(status, objects, total_start)
+
     def _classify_detections(self, image: Image.Image, detections, timings):
-        """Clasifica el recorte de cada objeto detectado por YOLO."""
         valid = [d for d in detections if self._box_is_valid(d["bbox"])]
         valid.sort(key=lambda d: d["confidence"], reverse=True)
 
-        results = []
+        objects = []
         for det in valid[:MAX_OBJECTS]:
             x1, y1, x2, y2 = det["bbox"]
             crop = image.crop((x1, y1, x2, y2))
-
             predictions = self._run(
                 timings, "classifier_ms", self.classifier.classify, crop
             )
-
-            obj = DetectedObject(
-                detection_label=det["label"],
-                bbox=(x1, y1, x2, y2),
-                detection_score=det["confidence"],
+            objects.append(
+                self._to_object(det["label"], (x1, y1, x2, y2), det["confidence"], predictions)
             )
-            if predictions:
-                obj.classification = predictions[0]
-                if predictions[0].score >= CLASSIFICATION_THRESHOLD:
-                    rec = get_recycling_recommendation(predictions[0].label)
-                    obj.recycling_bin = rec["bin"]
-                    obj.recycling_tip = rec["tip"]
+        return objects
 
-            results.append((obj, predictions))
-        return results
+    def _classify_full_image(self, image: Image.Image, timings):
+        predictions = self._run(
+            timings, "classifier_ms", self.classifier.classify, image
+        )
+        if not predictions or predictions[0].score < CLASSIFICATION_THRESHOLD:
+            return None
+        width, height = image.size
+        return self._to_object("imagen completa", (0, 0, width, height), 1.0, predictions)
 
+    @staticmethod
+    def _to_object(label, bbox, score, predictions) -> DetectedObject:
+        obj = DetectedObject(
+            detection_label=label, bbox=bbox, detection_score=score
+        )
+        if predictions:
+            obj.classification = predictions[0]
+            if predictions[0].score >= CLASSIFICATION_THRESHOLD:
+                rec = get_recycling_recommendation(predictions[0].label)
+                obj.recycling_bin = rec["bin"]
+                obj.recycling_tip = rec["tip"]
+        return obj
+
+    # ------------------------------------------------------------------
+    # Utilidades
+    # ------------------------------------------------------------------
     @staticmethod
     def _box_is_valid(bbox) -> bool:
         x1, y1, x2, y2 = bbox
@@ -180,7 +195,7 @@ class RecyclingPipeline:
         timings[key] = timings.get(key, 0.0) + (perf_counter() - start) * 1000
         return result
 
-    def _build(self, status, top, waste_bin, tip, objects, timings, total_start):
+    def _build(self, status, top, waste_bin, tip, timings, total_start):
         timings["total_ms"] = (perf_counter() - total_start) * 1000
         return AnalysisResult(
             status=status,
@@ -189,6 +204,13 @@ class RecyclingPipeline:
             tip=tip,
             device=self.device,
             timings_ms=timings,
+        )
+
+    def _live(self, status, objects, total_start) -> LiveResult:
+        return LiveResult(
+            status=status,
+            device=self.device,
+            total_ms=(perf_counter() - total_start) * 1000,
             objects=objects,
         )
 
