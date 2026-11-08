@@ -191,7 +191,7 @@ Imágenes: 25 | repeticiones: 3 | preprocesado: resize=224, JPEG=85
 | **PROMEDIO** | **165.69** | **49.89** | **129.66** | **-36.04** | **11/25** |
 
 # Conclusiones
-El preprocesamiento con recorte a 224 × 224 y compresión JPEG redujo el tiempo de inferencia, pero al incluir el costo de transformar la imagen fue más lento en promedio. Además, cambió varias predicciones y coincidió con el resultado original en solo 11 de 25 imágenes, las predicciones tambien empeoraron en su mayoria en comparacion con la version sin preprocesar.
+El preprocesamiento con recorte a 224 × 224 y compresión JPEG redujo el tiempo total promedio registrado: 129,66 ms frente a 165,69 ms de la imagen original (36,04 ms menos, incluido el tiempo de transformación). Sin embargo, la salida coincidió con la original en solo 11 de 25 imágenes. Como no hay etiquetas reales para calcular la exactitud, esta cifra mide coincidencia con la línea base, no aciertos. En la revisión visual, la salida original se consideró más confiable; por ello, no se añadió este preprocesado al pipeline.
 
 # Prueba salida 2
 
@@ -387,4 +387,4 @@ Loading weights: 100%|███████████████████�
 
 # Concluciones
 
-El método letterbox, que conserva la imagen completa y añade márgenes, también fue más rápido en el promedio registrado, pero cambió algunas clasificaciones sin mejorar consistentemente los aciertos. Según la revisión visual, el resultado original siguió siendo más confiable.
+El método letterbox, que conserva la imagen completa y añade márgenes, tuvo un tiempo total promedio de 120,29 ms frente a 166,80 ms de la imagen original (46,50 ms menos, incluido el tiempo de transformación). Las predicciones coincidieron en clase y bote con la salida original en 16 de 25 imágenes; la columna de etiquetas reales está vacía, así que no mide exactitud. Según la revisión visual, el resultado original siguió siendo más confiable y no se añadió el preprocesado al pipeline.
