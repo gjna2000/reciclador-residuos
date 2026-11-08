@@ -1,20 +1,8 @@
-"""Cámara en tiempo real: detecta objetos con YOLO y los clasifica.
-
-Uso desde app.py:
-    from src.ui.camera import render_camera_tab
-    render_camera_tab(pipeline)
-
-La interfaz solo habla con RecyclingPipeline (analyze y analyze_live);
-no importa modelos. El análisis corre en un hilo aparte para que el video
-no se congele.
-"""
-
 import threading
 import time
 
 import av
 import cv2
-import streamlit as st
 from PIL import Image
 from streamlit_webrtc import (
     RTCConfiguration,
@@ -23,7 +11,9 @@ from streamlit_webrtc import (
     webrtc_streamer,
 )
 
-RTC_CONFIG = RTCConfiguration(
+DEFAULT_KEY = "camara-residuos"
+
+DEFAULT_RTC_CONFIG = RTCConfiguration(
     {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
 )
 
@@ -36,6 +26,11 @@ BIN_COLORS = {
 }
 UNCERTAIN_COLOR = (150, 150, 150)
 FONT = cv2.FONT_HERSHEY_SIMPLEX
+
+
+def is_live_available(pipeline) -> bool:
+    """True si el pipeline tiene el detector YOLO cargado."""
+    return getattr(pipeline, "detector", None) is not None
 
 
 def _color_for(bin_name):
@@ -84,6 +79,12 @@ class DetectorProcessor(VideoProcessorBase):
     def on_ended(self):
         self._stop.set()
 
+    @property
+    def last_result(self):
+        """Último LiveResult (o None). Útil si app.py quiere mostrarlo aparte."""
+        with self._lock:
+            return self._result
+
     # ---- hilo de video ----------------------------------------------------
     def recv(self, frame):
         img = frame.to_ndarray(format="bgr24")
@@ -104,6 +105,8 @@ class DetectorProcessor(VideoProcessorBase):
 
     @staticmethod
     def _draw(img, result):
+        # Campos que usa: LiveResult(status, device, total_ms, objects) y
+        # DetectedObject(bbox, recycling_bin, classification, detection_label).
         for obj in result.objects:
             x1, y1, x2, y2 = obj.bbox
             color = _color_for(obj.recycling_bin)
@@ -121,35 +124,26 @@ class DetectorProcessor(VideoProcessorBase):
         _text(img, banner, (10, 24), (255, 255, 255))
 
 
-def render_camera_tab(pipeline):
-    """Pestaña de cámara en vivo, con respaldo de foto instantánea."""
-    st.subheader("Cámara en tiempo real")
-    st.caption(
-        "Pulsa START, permite el acceso a la cámara y apunta a un residuo. "
-        "Blanco, negro, verde y naranja indican la caneca recomendada."
-    )
+def render_live_camera(
+    pipeline,
+    key: str = DEFAULT_KEY,
+    interval: float = 0.5,
+    rtc_configuration=None,
+):
+    """Muestra la cámara en vivo con las detecciones dibujadas.
 
-    webrtc_streamer(
-        key="camara-residuos",
+    No agrega títulos ni textos: eso lo decide app.py.
+    Devuelve el contexto de streamlit-webrtc (ctx.state.playing indica si
+    el video está activo).
+    """
+    return webrtc_streamer(
+        key=key,
         mode=WebRtcMode.SENDRECV,
-        rtc_configuration=RTC_CONFIG,
+        rtc_configuration=rtc_configuration or DEFAULT_RTC_CONFIG,
         media_stream_constraints={
             "video": {"width": {"ideal": 640}, "height": {"ideal": 480}},
             "audio": False,
         },
-        video_processor_factory=lambda: DetectorProcessor(pipeline),
+        video_processor_factory=lambda: DetectorProcessor(pipeline, interval),
         async_processing=True,
     )
-
-    with st.expander("¿No funciona el video? Usa una foto"):
-        photo = st.camera_input("Toma una foto del residuo")
-        if photo:
-            result = pipeline.analyze(photo)
-            if result.status == "reciclable":
-                st.success(f"Caneca: {result.bin}. {result.tip}")
-            elif result.status == "no_es_residuo":
-                st.warning(result.tip)
-            else:
-                st.info(result.tip)
-            for prediction in result.top:
-                st.write(f"{prediction.label}: {prediction.score:.1%}")
