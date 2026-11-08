@@ -38,7 +38,7 @@ class RecyclingPipeline:
         print(f"Cargando pipeline en {self.device}...")
 
         self.gate = Gate(device=str(self.device))
-        self.detector = GDinoDetector()
+        self.detector = GDinoDetector(device=str(self.device))
         self.classifier = WasteClassifier(device=str(self.device))
 
         print("Pipeline cargado correctamente.")
