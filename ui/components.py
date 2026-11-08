@@ -256,6 +256,30 @@ BIN_INFO = {
 }
 DEFAULT_BIN_INFO = BIN_INFO["Contenedor Blanco"]
 
+# Valores reales de `result.bin` (los que entrega recycling_rules.py) -> presentación.
+# No se deduce nada a partir de la categoría: solo se traduce el valor del contrato.
+RESULT_BINS = {
+    "blanco": {"group": "blanca", "color": "#F8FAFC", "short": "Blanca", "badge": "Caneca Blanca",
+               "sub": "Aprovechables limpios y secos", "heading": "Caneca Blanca: Residuos Aprovechables",
+               "special": False},
+    "verde": {"group": "verde", "color": "#15803D", "short": "Verde", "badge": "Caneca Verde",
+              "sub": "Orgánicos aprovechables", "heading": "Caneca Verde: Residuos Orgánicos Aprovechables",
+              "special": False},
+    "negro": {"group": "negra", "color": "#334155", "short": "Negra", "badge": "Caneca Negra",
+              "sub": "No aprovechables", "heading": "Caneca Negra: No Aprovechables",
+              "special": False},
+    "punto-especial": {"group": "especial", "color": "#0E3B2E", "short": "Punto especial", "badge": "Punto Especial",
+                       "sub": "Recolección posconsumo o reúso", "heading": "Punto Especial: Recolección Posconsumo",
+                       "special": True},
+}
+
+
+def _result_bin(bin_value: str | None) -> dict | None:
+    """Devuelve la presentación de `result.bin`, o None si no existe o no se reconoce."""
+    if not bin_value:
+        return None
+    return RESULT_BINS.get(str(bin_value).strip().lower())
+
 FILTERS = {
     "Todos": None,
     "Aprovechables (Caneca Blanca)": "blanca",
@@ -495,42 +519,57 @@ def result_card(result) -> None:
     with st.container(key=f"result_card_{css}"):
         if result.status == "reciclable" and result.top:
             best = result.top[0]
-            det = CATEGORY_DETAILS.get(best.label, {
-                "title": CATEGORIES.get(best.label, best.label),
-                "bin_name": "Contenedor Blanco",
-                "bin_color": "#F8FAFC",
-                "bin_heading": "Caneca Blanca: Residuos Aprovechables",
-                "bin_tag": "Caneca Blanca: Aprovechable",
-                "tip": result.tip,
-            })
-            info = _bin_info(det)
-            color = det.get("bin_color", "#F8FAFC")
+            # Solo el nombre para mostrar sale de CATEGORY_DETAILS; contenedor y consejo salen del resultado.
+            det = CATEGORY_DETAILS.get(best.label, {})
+            title = det.get("title", CATEGORIES.get(best.label, best.label))
+            rbin = _result_bin(result.bin)
             score = min(max(best.score, 0.0), 1.0)
             level = "Alta" if score >= 0.8 else "Media" if score >= 0.5 else "Baja"
-            destino = "punto de recolección autorizado" if info["special"] else info["badge"].lower()
+
+            if rbin:
+                color = rbin["color"]
+                destino = "punto de recolección autorizado" if rbin["special"] else rbin["badge"].lower()
+                stage_html = f"""
+                    <div class="eco-stage">
+                      <div class="eco-stage-head">
+                        <span class="eco-bin-dot" style="background:{color}"></span>
+                        <span>{rbin["heading"]}</span>
+                      </div>
+                      <div class="eco-stage-body eco-anim-{tick % 2}">
+                        {_bin_svg(color)}
+                        <div class="eco-toast">{_icon("verified")}<span>Entrega en {destino}</span></div>
+                      </div>
+                    </div>
+                """
+                bin_metric = f"""
+                    <div class="lbl"><span>{"Destino" if rbin["special"] else "Color caneca"}</span>{_icon("recycling")}</div>
+                    <div class="eco-bin-row"><span class="sw" style="background:{color}"></span><span>{rbin["short"]}</span></div>
+                    <div class="sub">{rbin["sub"]}</div>
+                """
+            else:
+                # Sin `result.bin` no se asigna ningún contenedor.
+                color = "#CBD5E1"
+                stage_html = ""
+                bin_metric = f"""
+                    <div class="lbl"><span>Destino</span>{_icon("recycling")}</div>
+                    <div class="eco-bin-row"><span class="sw" style="background:{color}"></span><span>Sin asignar</span></div>
+                    <div class="sub">No hay contenedor indicado para este residuo</div>
+                """
 
             _md(f"""
                 <div class="eco-binbar" style="background:{color}"></div>
                 <div class="eco-res-head">
                   <div>
                     <div class="eco-eyebrow">Norma técnica Colombia (Res. 2184)</div>
-                    <div class="eco-res-title">{det['title']}</div>
+                    <div class="eco-res-title">{title}</div>
                   </div>
                   <span class="eco-pill eco-pill-{css}">{_icon("check_circle", 16)}{pill}</span>
                 </div>
-                <div class="eco-stage">
-                  <div class="eco-stage-head">
-                    <span class="eco-bin-dot" style="background:{color}"></span>
-                    <span>{det.get('bin_heading', info['badge'])}</span>
-                  </div>
-                  <div class="eco-stage-body eco-anim-{tick % 2}">
-                    {_bin_svg(color)}
-                    <div class="eco-toast">{_icon("verified")}<span>Entrega en {destino}</span></div>
-                  </div>
-                </div>
+                {stage_html}
             """)
 
-            st.button("Animar depósito", key="replay_anim", on_click=_replay_animation, type="secondary")
+            if rbin:
+                st.button("Animar depósito", key="replay_anim", on_click=_replay_animation, type="secondary")
 
             _md(f"""
                 <div class="eco-metrics">
@@ -540,17 +579,16 @@ def result_card(result) -> None:
                     <div class="eco-meter"><div style="width:{score * 100:.1f}%"></div></div>
                   </div>
                   <div class="eco-metric">
-                    <div class="lbl"><span>{"Destino" if info["special"] else "Color caneca"}</span>{_icon("recycling")}</div>
-                    <div class="eco-bin-row"><span class="sw" style="background:{color}"></span><span>{info["short"]}</span></div>
-                    <div class="sub">{info["sub"]}</div>
+                    {bin_metric}
                   </div>
                 </div>
                 <div class="eco-tip">
                   <div class="ic">{_icon("tips_and_updates", 20)}</div>
-                  <div><b>Recomendación de disposición</b><p>{det.get('tip', result.tip)}</p></div>
+                  <div><b>Recomendación de disposición</b><p>{result.tip}</p></div>
                 </div>
             """)
-            top_predictions(result.top, "Top 3 predicciones del modelo")
+            n_top = min(len(result.top), 3)
+            top_predictions(result.top, f"Top {n_top} predicciones del modelo" if n_top > 1 else "Predicción del modelo")
         else:
             title = "La imagen no parece un residuo" if result.status == "no_es_residuo" else "Resultado incierto"
             icon = "image_search" if result.status == "no_es_residuo" else "help"
@@ -575,12 +613,24 @@ def tech_info(result) -> None:
     with st.expander("Información técnica del análisis", expanded=False):
         c1, c2 = st.columns(2)
         c1.metric("Dispositivo de inferencia", result.device)
-        total_time = sum(result.timings_ms.values())
+        timings = result.timings_ms or {}
+        # `total_ms` ya es la suma de las etapas: no se vuelve a sumar junto con los parciales.
+        if "total_ms" in timings:
+            total_time = timings["total_ms"]
+        else:
+            total_time = sum(timings.values())
         c2.metric("Tiempo de análisis", f"{total_time:.0f} ms")
 
 
-def bins_overview() -> None:
-    """Resumen compacto de las 3 canecas y los puntos especiales."""
+def bins_overview(selected_bin: str | None = None) -> None:
+    """Resumen compacto de las 3 canecas y los puntos especiales.
+
+    `selected_bin` debe ser `result.bin` (blanco, verde, negro, punto-especial). Solo se
+    resalta ese contenedor; nunca se deduce a partir de la categoría detectada.
+    """
+    rbin = _result_bin(selected_bin)
+    active_group = rbin["group"] if rbin else None
+    highlight = "outline:3px solid #16A34A;outline-offset:2px;box-shadow:0 0 0 6px rgba(22,163,74,.15);"
     groups: dict[str, list[tuple[str, dict]]] = {}
     for key, det in CATEGORY_DETAILS.items():
         groups.setdefault(_bin_info(det)["group"], []).append((key, det))
@@ -599,8 +649,9 @@ def bins_overview() -> None:
             continue
         first = items[0][1]
         info = _bin_info(first)
+        is_active = group == active_group
         cards += f"""
-            <div class="eco-bin-card">
+            <div class="eco-bin-card{" active" if is_active else ""}"{f' style="{highlight}"' if is_active else ""}>
               <div class="eco-bin-card-head">
                 <span class="eco-bin-dot" style="background:{first.get('bin_color', '#F8FAFC')}"></span>
                 <div><b>{info['badge']}</b><span class="s">{info['sub']}</span></div>
@@ -609,7 +660,8 @@ def bins_overview() -> None:
             </div>"""
 
     special = groups.get("especial", [])
-    strip = (f'<div class="eco-bin-special"><span class="lbl">{_icon("recycling", 16)}Puntos especiales</span>'
+    strip_style = f' style="{highlight}"' if active_group == "especial" else ""
+    strip = (f'<div class="eco-bin-special{" active" if strip_style else ""}"{strip_style}><span class="lbl">{_icon("recycling", 16)}Puntos especiales</span>'
              f'{chips(special, True)}</div>') if special else ""
 
     section_title("¿Qué va en cada caneca?", "Separación en la fuente según la Resolución 2184.", anchor="canecas")
