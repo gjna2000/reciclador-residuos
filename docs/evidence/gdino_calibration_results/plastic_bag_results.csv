@@ -1,0 +1,11 @@
+image,configuration,threshold,inference_ms,candidate_count,selected_count,label,score,box_xyxy,annotated_image
+plastic_bag.jpg,configuration_01,0.05,5934.32,103,4,wrapper,0.2562,"130.0,251.0,604.0,896.0",benchmarks/gdino_calibration_results/plastic_bag_configuration_01.jpg
+plastic_bag.jpg,configuration_01,0.05,5934.32,103,4,peel,0.2115,"127.0,249.0,603.0,897.0",benchmarks/gdino_calibration_results/plastic_bag_configuration_01.jpg
+plastic_bag.jpg,configuration_01,0.05,5934.32,103,4,wrapper,0.1623,"301.0,0.0,663.0,361.0",benchmarks/gdino_calibration_results/plastic_bag_configuration_01.jpg
+plastic_bag.jpg,configuration_01,0.05,5934.32,103,4,peel,0.1074,"301.0,0.0,661.0,360.0",benchmarks/gdino_calibration_results/plastic_bag_configuration_01.jpg
+plastic_bag.jpg,configuration_02,0.1,5764.66,20,4,wrapper,0.2562,"130.0,251.0,604.0,896.0",benchmarks/gdino_calibration_results/plastic_bag_configuration_02.jpg
+plastic_bag.jpg,configuration_02,0.1,5764.66,20,4,peel,0.2115,"127.0,249.0,603.0,897.0",benchmarks/gdino_calibration_results/plastic_bag_configuration_02.jpg
+plastic_bag.jpg,configuration_02,0.1,5764.66,20,4,wrapper,0.1623,"301.0,0.0,663.0,361.0",benchmarks/gdino_calibration_results/plastic_bag_configuration_02.jpg
+plastic_bag.jpg,configuration_02,0.1,5764.66,20,4,peel,0.1074,"301.0,0.0,661.0,360.0",benchmarks/gdino_calibration_results/plastic_bag_configuration_02.jpg
+plastic_bag.jpg,configuration_03,0.2,5776.15,2,2,wrapper,0.2562,"130.0,251.0,604.0,896.0",benchmarks/gdino_calibration_results/plastic_bag_configuration_03.jpg
+plastic_bag.jpg,configuration_03,0.2,5776.15,2,2,peel,0.2115,"127.0,249.0,603.0,897.0",benchmarks/gdino_calibration_results/plastic_bag_configuration_03.jpg

@@ -1,0 +1,6 @@
+image,configuration,threshold,inference_ms,candidate_count,selected_count,label,score,box_xyxy,annotated_image
+blurry.jpg,configuration_01,0.05,4397.82,35,3,wrapper,0.0642,"2.0,645.0,1020.0,1022.0",benchmarks/gdino_calibration_v2_results/blurry_configuration_01.jpg
+blurry.jpg,configuration_01,0.05,4397.82,35,3,bottle,0.0577,"572.0,0.0,1020.0,131.0",benchmarks/gdino_calibration_v2_results/blurry_configuration_01.jpg
+blurry.jpg,configuration_01,0.05,4397.82,35,3,wrapper,0.0558,"5.0,1.0,1019.0,700.0",benchmarks/gdino_calibration_v2_results/blurry_configuration_01.jpg
+blurry.jpg,configuration_02,0.1,4402.17,12,0,,,,benchmarks/gdino_calibration_v2_results/blurry_configuration_02.jpg
+blurry.jpg,configuration_03,0.2,4472.66,2,0,,,,benchmarks/gdino_calibration_v2_results/blurry_configuration_03.jpg

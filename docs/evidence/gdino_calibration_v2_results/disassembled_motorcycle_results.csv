@@ -1,0 +1,8 @@
+image,configuration,threshold,inference_ms,candidate_count,selected_count,label,score,box_xyxy,annotated_image
+disassembled_motorcycle.jpg,configuration_01,0.05,6646.02,101,4,wrapper,0.1654,"10.0,378.0,518.0,1005.0",benchmarks/gdino_calibration_v2_results/disassembled_motorcycle_configuration_01.jpg
+disassembled_motorcycle.jpg,configuration_01,0.05,6646.02,101,4,wrapper,0.1240,"83.0,0.0,574.0,573.0",benchmarks/gdino_calibration_v2_results/disassembled_motorcycle_configuration_01.jpg
+disassembled_motorcycle.jpg,configuration_01,0.05,6646.02,101,4,wrapper,0.0945,"339.0,587.0,446.0,666.0",benchmarks/gdino_calibration_v2_results/disassembled_motorcycle_configuration_01.jpg
+disassembled_motorcycle.jpg,configuration_01,0.05,6646.02,101,4,bottle,0.0744,"41.0,376.0,158.0,482.0",benchmarks/gdino_calibration_v2_results/disassembled_motorcycle_configuration_01.jpg
+disassembled_motorcycle.jpg,configuration_02,0.1,6593.47,12,2,wrapper,0.1654,"10.0,378.0,518.0,1005.0",benchmarks/gdino_calibration_v2_results/disassembled_motorcycle_configuration_02.jpg
+disassembled_motorcycle.jpg,configuration_02,0.1,6593.47,12,2,wrapper,0.1240,"83.0,0.0,574.0,573.0",benchmarks/gdino_calibration_v2_results/disassembled_motorcycle_configuration_02.jpg
+disassembled_motorcycle.jpg,configuration_03,0.2,6649.35,0,0,,,,benchmarks/gdino_calibration_v2_results/disassembled_motorcycle_configuration_03.jpg
