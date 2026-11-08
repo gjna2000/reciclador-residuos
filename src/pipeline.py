@@ -163,4 +163,6 @@ else:
             tip=tip,
             device=str(self.device),
             timings_ms=timings
+            objects=object_results
         )
+
