@@ -84,6 +84,9 @@ Todos en `docs/evidence/`.
 | `gpu_fp32_vs_fp16.png` | Corrida solo en GPU con 500 repeticiones, que respalda el descarte de fp16 |
 | `nvidia_smi_idle.png` | `nvidia-smi` con la GPU en reposo |
 | `nvidia_smi_inference.png` | `nvidia-smi` durante la inferencia: 97 % de utilización y más memoria |
+| 2026-11-07 | Se descarta YOLO del pipeline | Falló en la prueba (no detectó el sachet) y su vocabulario es cerrado (clases de COCO); se necesita detectar objetos sin importar su clase para recortar la imagen |
+| 2026-11-07 | Se adopta Grounding DINO tiny como detector, con la configuración 3 (umbral 0,20; NMS global con IoU 0,5; máximo 4 detecciones; descarta cajas de más del 70 % de la imagen) | Dio los resultados visuales más limpios y menos falsos positivos en las imágenes de prueba; es una selección por inspección visual, no una calibración probabilística |
+| 2026-11-07 | Se descartan la fiabilidad con campana de Gauss y el modelo de lenguaje con prompt maestro | Decisión del equipo por votación |
 
 Rótulos para el README y `docs/cuda.md`:
 
@@ -97,6 +100,19 @@ Rótulos para el README y `docs/cuda.md`:
 ## 5. Bitácora
 
 Las entradas nuevas van arriba.
+
+### 2026-11-07 · Reemplazo de YOLO por Grounding DINO y selección de configuración
+
+- Qué se hizo: tras descartar YOLO (no detectó el sachet y su vocabulario es cerrado), se probaron detectores de vocabulario abierto para recortar objetos sin importar su clase. Se eligió Grounding DINO (`IDEA-Research/grounding-dino-tiny`, Apache 2.0) y se probaron tres configuraciones de umbral (0,05; 0,10 y 0,20) con `benchmarks/gdino_calibration_v2.py`. La versión 1 aplicaba NMS por etiqueta y dejaba duplicados de la misma región; la versión 2 aplica NMS global, sin separar por etiqueta.
+- Resultado: se seleccionó la configuración 3: umbral 0,20; NMS global con IoU de 0,5; se descartan cajas vacías y cajas que cubren más del 70 % de la imagen; máximo 4 detecciones por imagen; ejecución en GPU. En `babana_coffee_sachet_1.jpg` detectó dos objetos y los clasificó correctamente; en `babana_coffee_sachet_2.jpg` mantuvo las detecciones de la cáscara y el sachet (la configuración 2 añadía un detalle impreso del empaque y un empaque adicional); en `plastic_bag.jpg` detectó la bolsa y evitó cajas dudosas sobre el escritorio y la hoja. También se probó con `exit_mf.jpeg`, `kitchen.jpg`, `disassembled_motorcycle.jpg`, `chair_pants.jpg` y una imagen borrosa.
+- Decisión tomada: se adopta la configuración 3. Es una selección operativa basada en inspección visual, no una calibración probabilística de los puntajes. Un umbral de 0,20 puede descartar objetos reales con puntajes menores; si aparece un caso así, se registra y se reevalúa.
+- Pendiente: medir el tiempo y la memoria de la etapa de detección en CPU y GPU; integrar el detector en el pipeline con Javier.
+
+### 2026-11-07 · Comparación inicial de detectores de vocabulario abierto
+
+- Qué se hizo: se probaron Grounding DINO tiny y OWLv2 base (`google/owlv2-base-patch16-ensemble`) con `babana_coffee_sachet_2.jpg` completa (unos 3048 × 4060 px), con las palabras `trash`, `waste`, `packaging`, `wrapper`, `peel`, `bottle` y `can` y umbral 0,1.
+- Resultado: Grounding DINO tardó 6554 ms, con pico de 1744 MiB y 32 detecciones (puntaje máximo 0,27, varias cajas que cubrían casi toda la foto y la misma caja con varias etiquetas). OWLv2 tardó 10 952 ms, con pico de 771 MiB y 24 detecciones (puntaje máximo 0,38, sin cajas de foto completa).
+- Pendiente: repetir la medición con la foto reducida, porque ambos tiempos corresponden a la imagen completa.
 
 ### 2026-11-06 · Pruebas de preprocesado (sugerencia del profesor)
 
@@ -167,6 +183,12 @@ Las entradas nuevas van arriba.
 - [ ] Acordar con Javier el cambio del contrato (campos opcionales en `AnalysisResult`) y las claves de `timings_ms`
 - [x] Repetir el benchmark del pipeline completo después de añadir el preprocesado y el modelo de lenguaje(descartado por decicion popular, viva la democracia :D)
 - [ ] Probar el plan B en Colab o Kaggle antes de la sustentación
+- [x] Probar detectores alternativos (Grounding DINO tiny, OWLv2) y decidir: se adopta Grounding DINO tiny con la configuración 3
+- [ ] Medir el tiempo y la memoria de la etapa de detección en CPU y GPU, e incluirlos en el benchmark del pipeline completo y en `docs/cuda.md`
+- [ ] Verificar la memoria de la GPU con los tres modelos cargados (Grounding DINO, CLIP y ViT)
+- [ ] Acordar con Javier cómo se integra el detector en `pipeline.py` (recortes, Gate y clasificador por objeto) y el cambio de `AnalysisResult` para varios objetos por imagen
+- [ ] Documentar Grounding DINO tiny en `docs/cuda.md` y en la ficha del modelo (criterio 1): parámetros, quién lo publicó, licencia, por qué se eligió frente a OWLv2 y YOLO, y ajustes (umbral y NMS)
+- [ ] Utilizar el caso del sachet y el límite del umbral 0,20 (puede omitir objetos reales) como casos límite en `docs/cuda.md` y en la sustentación
 
 ---
 
