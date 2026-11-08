@@ -156,9 +156,7 @@ class RecyclingPipeline:
             confident = (
                 best_pred.score >= CLASSIFICATION_THRESHOLD
             )
-
             # Aplicar reglas únicamente a predicciones confiables.
-                        # Aplicar reglas únicamente a predicciones confiables.
             if confident:
                 recommendation = get_recycling_recommendation(
                     best_pred.label
@@ -183,7 +181,6 @@ class RecyclingPipeline:
                     "Clasificación incierta. "
                     "Intenta tomar otra fotografía."
                 )
-
         # 6. Finalizar análisis.
         timings["total_ms"] = (
             perf_counter() - total_start
