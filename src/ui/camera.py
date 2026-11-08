@@ -1,3 +1,6 @@
+
+
+import logging
 import threading
 import time
 
@@ -10,6 +13,8 @@ from streamlit_webrtc import (
     WebRtcMode,
     webrtc_streamer,
 )
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_KEY = "camara-residuos"
 
@@ -29,14 +34,74 @@ FONT = cv2.FONT_HERSHEY_SIMPLEX
 
 
 def is_live_available(pipeline) -> bool:
-    """True si el pipeline tiene el detector YOLO cargado."""
-    return getattr(pipeline, "detector", None) is not None
+    """True si el pipeline tiene analyze_live y (si lo expone) un detector cargado."""
+    if not callable(getattr(pipeline, "analyze_live", None)):
+        return False
+    return getattr(pipeline, "detector", True) is not None
+
+
+# ----------------------------------------------------------------------
+# Lectura tolerante del resultado (objeto o diccionario)
+# ----------------------------------------------------------------------
+def _get(item, *names, default=None):
+    """Primer campo que exista y no sea None, en un diccionario o un objeto."""
+    for name in names:
+        if isinstance(item, dict):
+            value = item.get(name)
+        else:
+            value = getattr(item, name, None)
+        if value is not None:
+            return value
+    return default
+
+
+def _objects(result):
+    return _get(result, "objects", "detections", default=[]) or []
+
+
+def _total_ms(result):
+    value = _get(result, "total_ms")
+    if value is None:
+        timings = _get(result, "timings_ms", default={})
+        if isinstance(timings, dict):
+            value = timings.get("total_ms")
+    return value
+
+
+def _bbox(item):
+    box = _get(item, "bbox", "box")
+    if box is None:
+        return None
+    if isinstance(box, dict):
+        values = [box.get(k) for k in ("xmin", "ymin", "xmax", "ymax")]
+    else:
+        values = list(box)
+    if len(values) != 4 or any(v is None for v in values):
+        return None
+    return tuple(int(v) for v in values)
+
+
+def _label_text(item) -> str:
+    classification = _get(item, "classification")
+    if classification is None:
+        return str(
+            _get(item, "detection_label", "detected_label", "label", default="objeto")
+        )
+    if isinstance(classification, str):
+        label = classification
+        score = _get(item, "score", "confidence")
+    else:
+        label = _get(classification, "label", default="?")
+        score = _get(classification, "score")
+    if isinstance(score, (int, float)):
+        return f"{label} {score:.0%}"
+    return str(label)
 
 
 def _color_for(bin_name):
     if not bin_name:
         return UNCERTAIN_COLOR
-    key = "punto" if bin_name.startswith("punto") else bin_name
+    key = "punto" if str(bin_name).startswith("punto") else str(bin_name)
     return BIN_COLORS.get(key, UNCERTAIN_COLOR)
 
 
@@ -46,15 +111,50 @@ def _text(img, text, origin, color):
     cv2.putText(img, text, origin, FONT, 0.6, color, 2)
 
 
+def draw_result(img, result):
+    """Dibuja cajas, etiquetas y la línea de estado sobre el fotograma (BGR)."""
+    height, width = img.shape[:2]
+
+    for item in _objects(result):
+        box = _bbox(item)
+        if box is None:
+            continue
+        x1, y1, x2, y2 = box
+        x1, x2 = max(0, min(x1, width - 1)), max(0, min(x2, width - 1))
+        y1, y2 = max(0, min(y1, height - 1)), max(0, min(y2, height - 1))
+
+        color = _color_for(_get(item, "recycling_bin", "bin"))
+        cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
+        _text(img, _label_text(item), (x1, max(y1 - 8, 18)), color)
+
+    status = _get(result, "status", default="")
+    if status == "no_es_residuo":
+        banner = "No parece un residuo"
+    else:
+        ms = _total_ms(result)
+        parts = [
+            str(status),
+            str(_get(result, "device", default="")),
+            f"{ms:.0f} ms" if isinstance(ms, (int, float)) else "",
+        ]
+        banner = " | ".join(p for p in parts if p)
+    if banner:
+        _text(img, banner, (10, 24), (255, 255, 255))
+
+
+# ----------------------------------------------------------------------
+# Procesador de video
+# ----------------------------------------------------------------------
 class DetectorProcessor(VideoProcessorBase):
     """Recibe los fotogramas, los manda a analizar y dibuja el último resultado."""
 
-    def __init__(self, pipeline, interval: float = 0.5):
-        self.pipeline = pipeline
+    def __init__(self, analyze_fn, interval: float = 0.5):
+        self._analyze = analyze_fn  # imagen PIL -> resultado
         self.interval = interval  # segundos mínimos entre análisis
         self._lock = threading.Lock()
         self._latest = None  # último fotograma RGB pendiente de analizar
-        self._result = None  # último LiveResult
+        self._result = None  # último resultado
+        self._error = None  # último error del análisis (texto) o None
         self._last_submit = 0.0
         self._stop = threading.Event()
         self._worker = threading.Thread(target=self._loop, daemon=True)
@@ -69,21 +169,32 @@ class DetectorProcessor(VideoProcessorBase):
                 time.sleep(0.02)
                 continue
             try:
-                result = self.pipeline.analyze_live(Image.fromarray(frame))
-            except Exception:
+                result = self._analyze(Image.fromarray(frame))
+            except Exception as error:
+                # Nunca se silencia: queda en el log y se dibuja en el video.
+                logger.exception("Falló el análisis del fotograma")
+                with self._lock:
+                    self._error = f"{type(error).__name__}: {error}"
                 time.sleep(0.5)
                 continue
             with self._lock:
                 self._result = result
+                self._error = None
 
     def on_ended(self):
         self._stop.set()
 
     @property
     def last_result(self):
-        """Último LiveResult (o None). Útil si app.py quiere mostrarlo aparte."""
+        """Último resultado (o None). Útil si app.py quiere mostrarlo aparte."""
         with self._lock:
             return self._result
+
+    @property
+    def last_error(self):
+        """Último error del análisis (texto) o None si todo va bien."""
+        with self._lock:
+            return self._error
 
     # ---- hilo de video ----------------------------------------------------
     def recv(self, frame):
@@ -98,44 +209,35 @@ class DetectorProcessor(VideoProcessorBase):
 
         with self._lock:
             result = self._result
+            error = self._error
         if result is not None:
-            self._draw(img, result)
+            draw_result(img, result)
+        if error:
+            _text(img, f"Error: {error[:70]}", (10, 48), (0, 0, 255))
 
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
-    @staticmethod
-    def _draw(img, result):
-        # Campos que usa: LiveResult(status, device, total_ms, objects) y
-        # DetectedObject(bbox, recycling_bin, classification, detection_label).
-        for obj in result.objects:
-            x1, y1, x2, y2 = obj.bbox
-            color = _color_for(obj.recycling_bin)
-            cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
-            if obj.classification:
-                label = f"{obj.classification.label} {obj.classification.score:.0%}"
-            else:
-                label = obj.detection_label
-            _text(img, label, (x1, max(y1 - 8, 18)), color)
 
-        if result.status == "no_es_residuo":
-            banner = "No parece un residuo"
-        else:
-            banner = f"{result.status} | {result.device} | {result.total_ms:.0f} ms"
-        _text(img, banner, (10, 24), (255, 255, 255))
-
-
+# ----------------------------------------------------------------------
+# Función pública para app.py
+# ----------------------------------------------------------------------
 def render_live_camera(
-    pipeline,
+    pipeline=None,
     key: str = DEFAULT_KEY,
     interval: float = 0.5,
     rtc_configuration=None,
+    analyze_fn=None,
 ):
     """Muestra la cámara en vivo con las detecciones dibujadas.
 
     No agrega títulos ni textos: eso lo decide app.py.
-    Devuelve el contexto de streamlit-webrtc (ctx.state.playing indica si
-    el video está activo).
+    Devuelve el contexto de streamlit-webrtc (ctx.state.playing indica si el
+    video está activo; ctx.video_processor.last_error muestra el último error).
     """
+    analyze = analyze_fn or getattr(pipeline, "analyze_live", None)
+    if not callable(analyze):
+        raise ValueError("Se necesita un pipeline con analyze_live o un analyze_fn.")
+
     return webrtc_streamer(
         key=key,
         mode=WebRtcMode.SENDRECV,
@@ -144,6 +246,6 @@ def render_live_camera(
             "video": {"width": {"ideal": 640}, "height": {"ideal": 480}},
             "audio": False,
         },
-        video_processor_factory=lambda: DetectorProcessor(pipeline, interval),
+        video_processor_factory=lambda: DetectorProcessor(analyze, interval),
         async_processing=True,
     )
