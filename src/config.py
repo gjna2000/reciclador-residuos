@@ -1,37 +1,30 @@
 
-# Modelos de Hugging Face
+# Grounding DINO
 
-GATE_MODEL_ID = "openai/clip-vit-base-patch32"
+GDINO_MODEL_ID = "IDEA-Research/grounding-dino-tiny"
 
-CLASSIFIER_MODEL_ID = "watersplash/waste-classification"
+GDINO_THRESHOLD = 0.20
 
-# Configuración de clasificación
+GDINO_MAX_AREA = 0.70
 
-TOP_K = 3
+GDINO_NMS_IOU = 0.50
 
-# Umbral del Gate CLIP
-GATE_THRESHOLD = 0.60
+GDINO_TOP_N = 4
 
-# Umbral mínimo de confianza del clasificador
-CLASSIFICATION_THRESHOLD = 0.60
-
-# Configuración de inferencia
-
-USE_FP16 = False
-
-# Clases reconocidas por el clasificador
-
-WASTE_CLASSES = [
-    "Plastic",
-    "Metal",
-    "Paper",
-    "Cardboard",
-    "Green-Glass",
-    "White-Glass",
-    "Biological",
-    "Brown-grass",
-    "Trash",
-    "Battery",
-    "Clothes",
-    "Shoes",
+GDINO_LABELS_ES = [
+    "basura",
+    "residuo",
+    "empaque",
+    "envoltura",
+    "cáscara",
+    "botella",
+    "lata",
+    "plástico",
+    "papel",
+    "cartón",
+    "vidrio",
+    "metal",
+    "residuo orgánico",
+    "bolsa plástica",
 ]
+
