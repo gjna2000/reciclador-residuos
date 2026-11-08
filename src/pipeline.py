@@ -3,9 +3,11 @@ from PIL import Image
 from time import perf_counter
 from .contracts import AnalysisResult, Prediction
 from .models.gate import Gate
+from .models.gdino_detector import GDinoDetector
 from .models.waste_classifier import WasteClassifier
 from .recycling_rules import get_recycling_recommendation
 from .config import CLASSIFICATION_THRESHOLD
+
 
 class RecyclingPipeline:
     """
@@ -23,6 +25,7 @@ class RecyclingPipeline:
         # Cargar los modelos una sola vez
         self.gate = Gate(device=str(self.device))
         self.classifier = WasteClassifier(device=str(self.device))
+        self.detector = GDinoDetector()
 
     def _prepare_image(self, image) -> Image.Image:
         """Convierte la imagen a formato RGB de forma segura."""
@@ -61,16 +64,79 @@ class RecyclingPipeline:
                 timings_ms=timings
             )
 
-        # 2. Clasificador de residuos
-        start = perf_counter()
-        predictions = self.classifier.classify(prepared_image)
-        timings["classifier_ms"] = (perf_counter() - start) * 1000
+        
+# 2. Detectar objetos con Grounding DINO
+start = perf_counter()
+detections = self.detector.detect(prepared_image)
+timings["detection_ms"] = (perf_counter() - start) * 1000
 
-        # 3. Validar umbral de confianza y reglas de reciclaje
-        if predictions:
-            best_pred = predictions[0]
-            if best_pred.score < CLASSIFICATION_THRESHOLD:
-                timings["total_ms"] = (perf_counter() - total_start) * 1000
+if not detections:
+    timings["total_ms"] = (perf_counter() - total_start) * 1000
+
+    return AnalysisResult(
+        status="no_es_residuo",
+        top=[],
+        bin=None,
+        tip="No se detectaron residuos en la imagen.",
+        device=str(self.device),
+        timings_ms=timings
+    )
+
+# 3. Clasificar individualmente cada objeto
+start = perf_counter()
+
+predictions = []
+object_results = []
+
+for detection in detections:
+
+    xmin, ymin, xmax, ymax = detection["box"]
+
+    # Recortar objeto detectado
+    crop = prepared_image.crop(
+        (xmin, ymin, xmax, ymax)
+    )
+
+    # Clasificar el recorte
+    crop_predictions = self.classifier.classify(crop)
+
+    if not crop_predictions:
+        continue
+
+    best_pred = crop_predictions[0]
+
+    # Obtener recomendación de reciclaje
+    recommendation = get_recycling_recommendation(
+        best_pred.label
+    )
+
+    # Guardar resultado individual
+    object_results.append({
+        "detected_label": detection["label"],
+        "detection_score": detection["score"],
+        "box": detection["box"],
+        "classification": best_pred.label,
+        "classification_score": best_pred.score,
+        "bin": recommendation["bin"],
+        "tip": recommendation["tip"]
+    })
+
+    predictions.append(best_pred)
+
+timings["classifier_ms"] = (perf_counter() - start) * 1000
+
+# 4. Construir resultado general
+if object_results:
+    first_object = object_results[0]
+
+    waste_bin = first_object["bin"]
+    tip = first_object["tip"]
+    status = "reciclable"
+else:
+    waste_bin = None
+    tip = "No fue posible clasificar los objetos detectados."
+    status = "incierto"
+
                 return AnalysisResult(
                     status="incierto",
                     top=predictions,
