@@ -1,4 +1,4 @@
- <div align="center">
+<div align="center">
 
 <img src="docs/img/banner.svg" alt="EcoClasifica" width="100%">
 
@@ -17,71 +17,101 @@
 
 ---
 
-##  Descripción
+## Descripción
 
-**EcoClasifica** es una aplicación desarrollada en Python y Streamlit que utiliza inteligencia artificial y visión por computador para identificar residuos a partir de imágenes y recomendar su correcta separación.
+**EcoClasifica** es una aplicación desarrollada en Python y Streamlit que utiliza visión por computador e inteligencia artificial para detectar y clasificar residuos, y recomendar su correcta separación.
 
-Su propósito es facilitar la clasificación de residuos, indicando si deben depositarse en una caneca blanca, verde, negra o llevarse a un punto de recolección especial.
+La aplicación contempla dos formas de entrada: cargar una imagen y utilizar la cámara en tiempo real. El sistema combina un detector de objetos **Grounding DINO** con un clasificador de residuos **Vision Transformer (ViT)**. A partir de los resultados, aplica las reglas de disposición configuradas en el proyecto para recomendar una caneca o un punto de recolección especial.
 
-El proyecto utiliza modelos preentrenados y permite aprovechar la GPU NVIDIA mediante CUDA cuando está disponible.
+El proyecto utiliza modelos preentrenados y puede aprovechar una GPU NVIDIA mediante CUDA cuando el entorno es compatible.
 
-##  Funcionalidades
+## Funcionalidades
 
 | Funcionalidad | Descripción |
 |---|---|
 | Carga de imágenes | Permite seleccionar una imagen para analizarla. |
-| Clasificación automática | Identifica el residuo entre 12 categorías. |
-| Nivel de confianza | Presenta las predicciones y sus puntuaciones. |
-| Recomendación | Indica la caneca o el punto de recolección correspondiente. |
-| Catálogo visual | Muestra las categorías reconocidas y su disposición. |
-| Procesamiento con GPU | Utiliza CUDA cuando el dispositivo es compatible. |
+| Cámara en tiempo real | Recibe fotogramas de la cámara y permite analizarlos de forma continua. |
+| Detección de objetos | Grounding DINO localiza objetos candidatos dentro de la imagen. |
+| Clasificación de residuos | ViT asigna una categoría de residuo a los objetos que pasan por el proceso de clasificación. |
+| Nivel de confianza | Permite consultar las puntuaciones asociadas a las predicciones, según los resultados del modelo. |
+| Recomendación de disposición | Relaciona la categoría identificada con la caneca o el punto de recolección correspondiente. |
+| Catálogo visual | Presenta las categorías reconocidas y su disposición. |
+| Procesamiento con GPU | Puede utilizar CUDA para ejecutar los modelos en una GPU NVIDIA compatible. |
 
-##  ¿Cómo funciona?
+> **Estado de integración:** el módulo de cámara utiliza `streamlit-webrtc` y está diseñado para enviar fotogramas al método de análisis en tiempo real del pipeline. La integración definitiva y la validación de los resultados dependen de la versión final del pipeline y de sus contratos.
 
-El sistema recibe una imagen y la procesa mediante el clasificador de residuos. Posteriormente, relaciona la categoría obtenida con las reglas de disposición definidas en el proyecto.
+## ¿Cómo funciona?
+
+EcoClasifica recibe una imagen cargada por el usuario o un fotograma de la cámara. La imagen se prepara y se envía al proceso de detección. Grounding DINO identifica regiones candidatas; posteriormente, el clasificador ViT permite determinar la categoría del residuo. Finalmente, las reglas del proyecto relacionan la categoría con una recomendación de disposición.
 
 ```mermaid
 flowchart TD
-    A[Entrada de imagen] --> B[Preparación de imagen]
-    B --> C[Clasificador ViT]
-    C --> D{Confianza de predicción}
-    D -->|Suficiente| E[Reglas de disposición]
-    D -->|Baja| F[Resultado incierto]
-    E --> G[Recomendación de caneca]
-    G --> H[Resultado en Streamlit]
-    F --> H
+    A[Imagen cargada o fotograma de cámara] --> B[Preparación de imagen]
+    B --> C[Detección de objetos: Grounding DINO]
+    C --> D[Regiones u objetos detectados]
+    D --> E[Clasificación de residuos: ViT]
+    E --> F{Confianza suficiente}
+    F -->|Sí| G[Reglas de disposición]
+    F -->|No| H[Resultado incierto]
+    G --> I[Caneca o punto especial recomendado]
+    I --> J[Resultado en Streamlit]
+    H --> J
 ```
 
-El sistema contempla estados para imágenes que no corresponden a residuos y predicciones con confianza insuficiente, según los umbrales configurados en el proyecto.
+El sistema contempla resultados inciertos cuando la predicción no alcanza los criterios de confianza definidos en la configuración. También puede contemplar imágenes u objetos que no correspondan a residuos, de acuerdo con las reglas implementadas en el pipeline.
 
-##  Modelo de inteligencia artificial
+## Modelos de inteligencia artificial
 
-### Clasificador de residuos — Vision Transformer (ViT)
+### 1. Detector de objetos — Grounding DINO
+
+Modelo utilizado: [`IDEA-Research/grounding-dino-tiny`](https://huggingface.co/IDEA-Research/grounding-dino-tiny).
+
+Grounding DINO se utiliza como detector de objetos: analiza la imagen y localiza regiones que corresponden a las etiquetas candidatas proporcionadas al modelo. Su función en EcoClasifica es encontrar los objetos que posteriormente pueden pasar al proceso de clasificación.
+
+La configuración seleccionada para las pruebas del proyecto es:
+
+| Parámetro | Configuración |
+|---|---|
+| Modelo | `IDEA-Research/grounding-dino-tiny` |
+| Umbral de detección | `0.20` |
+| Supresión de cajas duplicadas (NMS) | Global, sin separar por etiqueta |
+| IoU de NMS | `0.5` |
+| Área máxima de una caja | `70 %` de la imagen |
+| Máximo de detecciones | `4` |
+| Dispositivo utilizado en las pruebas | GPU CUDA |
+
+La configuración fue seleccionada mediante inspección visual comparativa de los resultados obtenidos con distintos umbrales e imágenes de prueba. Se priorizaron detecciones visualmente más limpias y una reducción de falsos positivos.
+
+**Nota:** el umbral `0.20` es una decisión operativa basada en esas pruebas. No representa una calibración probabilística de los puntajes ni implica que el modelo haya sido reentrenado. Un umbral más alto también puede omitir objetos reales con puntuaciones inferiores.
+
+El registro de esta decisión y el procedimiento de prueba se encuentran en [`docs/gdino_calibration_decision.md`](docs/gdino_calibration_decision.md), y el código de calibración se conserva en [`benchmarks/gdino_calibration_v2.py`](benchmarks/gdino_calibration_v2.py).
+
+### 2. Clasificador de residuos — Vision Transformer (ViT)
 
 Modelo utilizado: [`watersplash/waste-classification`](https://huggingface.co/watersplash/waste-classification).
 
-Es un modelo preentrenado de clasificación de imágenes basado en la arquitectura Vision Transformer (ViT), ajustado para reconocer diferentes tipos de residuos.
+Es un modelo preentrenado de clasificación de imágenes basado en la arquitectura Vision Transformer (ViT), utilizado para reconocer las categorías de residuos contempladas por el proyecto.
 
 | Característica | Información |
 |---|---|
 | Arquitectura | Vision Transformer (ViT) |
 | Tarea | Clasificación de imágenes |
 | Parámetros | 85,8 millones |
-| Tipo de pesos | F32 |
+| Tipo de pesos reportado | F32 |
 | Categorías | 12 |
-| Precisión de ejecución | FP32 |
+| Precisión de ejecución reportada en las pruebas | FP32 |
 | Resolución de entrada | 224 × 224 píxeles |
-| Dataset | [Garbage Classification](https://www.kaggle.com/datasets/mostafaabla/garbage-classification) |
+| Dataset asociado | [Garbage Classification](https://www.kaggle.com/datasets/mostafaabla/garbage-classification) |
 
-El modelo recibe la imagen, extrae sus características visuales y genera puntuaciones para las categorías aprendidas durante su entrenamiento. En EcoClasifica se conservan las tres predicciones principales y se aplica un umbral de confianza para determinar el resultado.
+El clasificador recibe la imagen o región que se le proporciona, extrae características visuales y genera puntuaciones para las categorías aprendidas durante su entrenamiento. En EcoClasifica se consideran las predicciones y los criterios de confianza configurados en el proyecto.
 
-**Importante:** el modelo no fue entrenado desde cero por el equipo. Se utiliza el modelo preentrenado disponible en Hugging Face.
+**Importante:** el equipo utiliza el modelo preentrenado disponible en Hugging Face; no se presenta como un modelo entrenado desde cero por el equipo.
 
-##  Categorías reconocidas
+## Categorías reconocidas
 
 El clasificador contempla 12 categorías, relacionadas con las reglas de disposición implementadas en EcoClasifica.
 
-| Categoría | Etiqueta del modelo | Destino |
+| Categoría | Etiqueta del modelo | Destino recomendado |
 |---|---|---|
 | Plástico | `Plastic` | Caneca blanca |
 | Metal | `Metal` | Caneca blanca |
@@ -96,7 +126,23 @@ El clasificador contempla 12 categorías, relacionadas con las reglas de disposi
 | Ropa | `Clothes` | Punto de recolección especial |
 | Calzado | `Shoes` | Punto de recolección especial |
 
-La asignación de los residuos sigue las reglas de separación en la fuente utilizadas en Colombia y las reglas configuradas en el proyecto.
+La asignación se basa en las reglas de separación en la fuente adoptadas por el proyecto. Para casos particulares, se debe atender la orientación de los sistemas locales de recolección.
+
+## Cámara en tiempo real
+
+La aplicación incorpora un módulo de cámara basado en [`streamlit-webrtc`](https://github.com/whitphx/streamlit-webrtc), que permite recibir video desde el navegador en lugar de limitarse a capturar una única fotografía.
+
+El módulo procesa fotogramas de video de manera periódica y los envía al método de análisis en tiempo real del pipeline. Para evitar ejecutar la inferencia en cada fotograma, el módulo utiliza un intervalo entre envíos. Los resultados disponibles pueden dibujarse sobre el video mediante cajas delimitadoras, etiquetas y colores asociados al contenedor recomendado.
+
+Características de la implementación:
+
+- Captura de video desde el navegador, con autorización del usuario.
+- Procesamiento periódico de fotogramas.
+- Ejecución del análisis en un hilo de trabajo separado del procesamiento del video.
+- Visualización de las detecciones y sus etiquetas sobre la imagen.
+- Comunicación con el pipeline mediante su método de análisis en tiempo real.
+
+La cámara requiere que el navegador tenga permiso para acceder al dispositivo. El funcionamiento desde otros equipos o redes puede depender de la configuración de WebRTC y de la conectividad disponible.
 
 ## Interfaz de usuario
 
@@ -106,10 +152,11 @@ Entre sus elementos se encuentran:
 
 - Encabezado y presentación del proyecto.
 - Área de carga y visualización de imágenes.
-- Panel de resultados de clasificación.
+- Acceso a la cámara en tiempo real.
+- Panel de resultados de detección y clasificación.
 - Catálogo visual de las 12 categorías.
 - Recomendaciones de disposición.
-- Animación de la caneca correspondiente al resultado.
+- Indicadores visuales de la caneca correspondiente al resultado.
 
 **Vista principal**
 
@@ -125,31 +172,43 @@ Entre sus elementos se encuentran:
   <img src="docs/img/resultado-clasificacion.png" alt="Resultado de clasificación de EcoClasifica" width="90%">
 </p>
 
-##  Tecnologías utilizadas
+**Cámara en tiempo real**
+
+<!-- Agregar captura real de la cámara con detecciones -->
+<p align="center">
+  <img src="docs/img/camara-tiempo-real.png" alt="Cámara en tiempo real de EcoClasifica" width="90%">
+</p>
+
+## Tecnologías utilizadas
 
 | Tecnología | Aplicación en el proyecto |
 |---|---|
 | Python | Lenguaje principal |
 | Streamlit | Interfaz de usuario |
-| PyTorch | Ejecución del modelo |
-| Hugging Face Transformers | Carga del clasificador ViT |
-| CUDA | Aceleración mediante GPU NVIDIA |
+| streamlit-webrtc | Captura y transmisión de video desde el navegador |
+| OpenCV | Procesamiento de fotogramas y dibujo de detecciones |
+| PyTorch | Ejecución de los modelos |
+| Hugging Face Transformers | Acceso a los modelos de visión |
+| Grounding DINO | Detección y localización de objetos |
+| Vision Transformer (ViT) | Clasificación de residuos |
+| CUDA | Aceleración mediante GPU NVIDIA compatible |
 | Git y GitHub | Control de versiones y colaboración |
 
-##  Instalación y ejecución
+## Instalación y ejecución
 
 ### Requisitos
 
 - Python 3.x.
 - Git.
-- Dependencias del archivo `requirements.txt`.
-- GPU NVIDIA compatible con CUDA (opcional).
+- Dependencias indicadas en `requirements.txt`.
+- GPU NVIDIA compatible con la versión de PyTorch/CUDA instalada (opcional).
+- Cámara y navegador con permisos de acceso, para utilizar el modo en tiempo real.
 
 ### 1. Clonar el repositorio
 
 ```bash
 git clone URL_DEL_REPOSITORIO
-cd reciclador-residuos
+cd NOMBRE_DEL_REPOSITORIO
 ```
 
 ### 2. Crear un entorno virtual
@@ -176,19 +235,21 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+Verifica que `requirements.txt` incluya las dependencias necesarias para Streamlit, `streamlit-webrtc`, PyTorch, Transformers, OpenCV y el procesamiento de imágenes y video utilizadas por el proyecto.
+
 ### 4. Ejecutar la aplicación
 
 ```bash
 streamlit run app.py
 ```
 
-Streamlit abrirá la aplicación en el navegador mediante la dirección local indicada en la terminal.
+Streamlit indicará en la terminal la dirección local para abrir la aplicación en el navegador.
 
-##  Procesamiento con CUDA
+## Procesamiento con CUDA
 
-EcoClasifica utiliza PyTorch para ejecutar el clasificador y seleccionar automáticamente el dispositivo disponible: CPU o GPU NVIDIA.
+EcoClasifica utiliza PyTorch para ejecutar los modelos y seleccionar el dispositivo disponible según la configuración del proyecto: CPU o GPU NVIDIA compatible con CUDA.
 
-Las pruebas de rendimiento se realizaron con una NVIDIA GeForce GTX 1650 Ti de 4 GB de memoria.
+Las pruebas de rendimiento documentadas para el clasificador ViT se realizaron con una NVIDIA GeForce GTX 1650 Ti de 4 GB de memoria.
 
 ### Comparación del clasificador ViT
 
@@ -200,22 +261,11 @@ Prueba realizada con una imagen de 1200 × 1200 píxeles, 30 repeticiones y 5 ej
 | GPU FP32 | 28,61 ms |
 | GPU FP16 | 118,52 ms |
 
-La GPU en FP32 fue aproximadamente **6,2 veces más rápida que la CPU** en esta prueba.
+En esta prueba, la GPU en FP32 fue aproximadamente **6,2 veces más rápida que la CPU**.
 
-La precisión FP16 fue descartada porque presentó un tiempo de inferencia mayor que FP32 en la GPU utilizada.
+La precisión FP16 se descartó para esta configuración porque presentó un tiempo de inferencia mayor que FP32 en la GPU utilizada.
 
-### Comparación del pipeline completo
-
-En una prueba experimental anterior, el pipeline que incluía un filtro CLIP y el clasificador ViT obtuvo los siguientes resultados:
-
-| Configuración | Tiempo total |
-|---|---:|
-| CPU FP32 | 328,09 ms |
-| GPU FP32 | 73,52 ms |
-
-La GPU fue aproximadamente **4,5 veces más rápida** en esa ejecución.
-
-> Esta medición corresponde a una versión experimental anterior que incluía CLIP. No representa el rendimiento de la arquitectura final sin ese componente.
+> Estos valores corresponden a las pruebas del clasificador ViT. No deben interpretarse como tiempos de ejecución de Grounding DINO ni como rendimiento del pipeline completo.
 
 ### Evidencia de GPU
 
@@ -226,15 +276,17 @@ Durante las pruebas del clasificador se registraron los siguientes valores media
 | Reposo | 0 % | 0 MiB | 44 °C |
 | Inferencia | 97 % | 463 MiB | 56 °C |
 
-<!-- Agregar capturas reales de docs/evidence -->
+<!-- Agregar o conservar la captura real si corresponde a estas mediciones -->
 <p align="center">
-  <img src="docs/evidence/cpu_vs_gpu.png" alt="Comparación CPU y GPU" width="75%">
+  <img src="docs/evidence/cpu_vs_gpu.png" alt="Evidencia de comparación de uso de GPU" width="75%">
 </p>
 
-##  Estructura del proyecto
+## Estructura del proyecto
+
+La siguiente estructura resume los directorios y archivos principales. Debe mantenerse sincronizada con la estructura real del repositorio.
 
 ```text
-reciclador-residuos/
+NOMBRE_DEL_REPOSITORIO/
 │
 ├── app.py
 ├── requirements.txt
@@ -252,31 +304,35 @@ reciclador-residuos/
 │   ├── models/
 │   │   ├── gate.py
 │   │   └── waste_classifier.py
-│   │
 │   ├── config.py
 │   ├── contracts.py
 │   ├── device.py
 │   ├── pipeline.py
-│   └── recycling_rules.py
+│   ├── recycling_rules.py
+│   └── ui/
+│       └── camara.py
 │
 ├── benchmarks/
+│   └── gdino_calibration_v2.py
 │
 ├── tests/
 │
 └── docs/
-    ├── cuda_log.md
-    └── evidence/
+    ├── img/
+    ├── evidence/
+    └── gdino_calibration_decision.md
 ```
 
-##  Limitaciones y trabajo futuro
+## Limitaciones y trabajo futuro
 
-- La clasificación depende de la calidad, iluminación y posición del objeto en la imagen.
-- La confianza del modelo no garantiza que una predicción sea correcta.
-- El modelo puede presentar errores con objetos o escenarios diferentes a los de sus datos de entrenamiento.
-- La detección de múltiples objetos mediante YOLO y su integración con la clasificación se encuentran pendientes de definir.
-- La entrada de cámara en tiempo real y la clasificación continua de objetos no se presentan como funcionalidades disponibles en esta versión.
+- La detección y clasificación dependen de la iluminación, la calidad de la imagen, la posición y el tamaño de los objetos.
+- Los puntajes de confianza no garantizan que una detección o clasificación sea correcta.
+- Grounding DINO puede generar falsos positivos u omitir objetos, especialmente cuando el objeto está parcialmente oculto o presenta condiciones visuales difíciles.
+- El umbral de detección seleccionado prioriza resultados visualmente más limpios, pero puede descartar objetos con puntuaciones inferiores.
+- La cámara en tiempo real depende de los permisos del navegador, la conectividad y la integración correcta con el pipeline.
+- La ejecución con CUDA requiere versiones compatibles de los controladores, PyTorch y las bibliotecas utilizadas.
 
-##  Equipo de desarrollo
+## Equipo de desarrollo
 
 | Integrante | Responsabilidad |
 |---|---|
@@ -287,20 +343,22 @@ reciclador-residuos/
 
 Proyecto desarrollado en el marco de la asignatura **Fundamentos de Computación Paralela y Distribuida**.
 
-##  Licencia y referencias
+## Licencia y referencias
 
 El código del proyecto se distribuye bajo la licencia [MIT](./LICENSE).
 
-La licencia del modelo preentrenado debe consultarse por separado en su ficha de Hugging Face.
+Las condiciones de uso de los modelos preentrenados deben consultarse por separado en sus respectivas fichas.
 
-- [Modelo de clasificación — Hugging Face](https://huggingface.co/watersplash/waste-classification)
+- [Grounding DINO Tiny — Hugging Face](https://huggingface.co/IDEA-Research/grounding-dino-tiny)
+- [Clasificador de residuos — Hugging Face](https://huggingface.co/watersplash/waste-classification)
 - [Dataset Garbage Classification — Kaggle](https://www.kaggle.com/datasets/mostafaabla/garbage-classification)
 - [Documentación de PyTorch](https://pytorch.org/docs/)
 - [Documentación de Streamlit](https://docs.streamlit.io/)
+- [streamlit-webrtc — GitHub](https://github.com/whitphx/streamlit-webrtc)
 - [Documentación de CUDA](https://docs.nvidia.com/cuda/)
 
 ---
 
 <p align="center">
-   <strong>EcoClasifica — Una mejor separación comienza con identificar correctamente.</strong>
+  <strong>EcoClasifica — Una mejor separación comienza con identificar correctamente.</strong>
 </p>
