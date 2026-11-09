@@ -256,8 +256,6 @@ BIN_INFO = {
 }
 DEFAULT_BIN_INFO = BIN_INFO["Contenedor Blanco"]
 
-# Valores reales de `result.bin` (los que entrega recycling_rules.py) -> presentación.
-# No se deduce nada a partir de la categoría: solo se traduce el valor del contrato.
 RESULT_BINS = {
     "blanco": {"group": "blanca", "color": "#F8FAFC", "short": "Blanca", "badge": "Caneca Blanca",
                "sub": "Aprovechables limpios y secos", "heading": "Caneca Blanca: Residuos Aprovechables",
@@ -469,14 +467,6 @@ def render_footer() -> None:
         </footer>
     """)
 
-
-# ---------------------------------------------------------------------------
-# Resultado
-# ---------------------------------------------------------------------------
-
-# Refinamiento visual SOLO de `result_card` (Fases 1 y 2). Todas las reglas están acotadas al
-# contenedor `st-key-result_card*`, por lo que no afectan a bins_overview, category_cards_grid
-# ni a ningún otro componente. Se evita tocar `opacity` / `transform` de los elementos animados.
 _RESULT_CARD_CSS = """<style>
 div[class*="st-key-result_card"]{background:#FBFDFC;border:1px solid rgba(14,59,46,.09);border-radius:1.15rem;box-shadow:0 1px 3px rgba(14,59,46,.04),0 8px 20px -10px rgba(14,59,46,.10);padding:1.25rem 1.25rem 1.25rem 1.5rem;}
 div[class*="st-key-result_card"][class*="_crop_"]{background:#F7FBF8;border-color:rgba(22,163,74,.12);box-shadow:none;}
@@ -686,7 +676,6 @@ def tech_info(result) -> None:
         c1, c2 = st.columns(2)
         c1.metric("Dispositivo de inferencia", result.device)
         timings = result.timings_ms or {}
-        # `total_ms` ya es la suma de las etapas: no se vuelve a sumar junto con los parciales.
         if "total_ms" in timings:
             total_time = timings["total_ms"]
         else:
@@ -832,8 +821,6 @@ def category_cards_grid(detected: str | None = None) -> None:
     ss = st.session_state
     ss.setdefault("manual_category", list(CATEGORIES.keys())[0])
     ss.setdefault("_last_detected", None)
-
-    # Un residuo recién detectado selecciona su categoría, pero el usuario puede seguir explorando.
     if detected and detected != ss["_last_detected"]:
         ss["manual_category"] = detected
     ss["_last_detected"] = detected

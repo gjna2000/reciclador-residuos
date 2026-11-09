@@ -125,16 +125,13 @@ def _signature(result):
     return (result.status, result.bin, top_label)
 
 
-# Límites SOLO de visualización para los recortes de la Fase 2 (no afectan lo que recibe ViT).
-_CROP_MAX_WIDTH = 260   # px máximos de ancho mostrado
-_CROP_MAX_HEIGHT = 240  # px máximos de alto mostrado (evita recortes verticales muy altos)
-_CROP_SLOT_HEIGHT = 300  # alto fijo del espacio de la imagen (recorte + leyenda) para equilibrar tarjetas
+_CROP_MAX_WIDTH = 260  
+_CROP_MAX_HEIGHT = 240 
+_CROP_SLOT_HEIGHT = 300  
 
-# Lienzo de tamaño fijo para la imagen original de la Fase 1 (solo visualización).
-# La imagen se escala con proporción original dentro de este lienzo (equivale a `object-fit: contain`)
-# y se centra; así imágenes verticales, horizontales y cuadradas ocupan siempre el mismo espacio.
-_PHASE1_CANVAS = (560, 320)          # (ancho, alto) en px del lienzo mostrado
-_PHASE1_BG = (241, 245, 249)         # fondo neutro del lienzo (franjas del «contain»)
+
+_PHASE1_CANVAS = (560, 320)         
+_PHASE1_BG = (241, 245, 249)       
 
 
 def _phase1_contain_view(image: Image.Image, objects: list) -> Image.Image:
@@ -160,7 +157,6 @@ def _phase1_contain_view(image: Image.Image, objects: list) -> Image.Image:
         x1, y1, x2, y2 = (int(value) for value in box)
         x1, x2 = max(0, min(x1, width - 1)), max(0, min(x2, width - 1))
         y1, y2 = max(0, min(y1, height - 1)), max(0, min(y2, height - 1))
-        # Mismas cajas, solo convertidas a la escala y posición del lienzo para dibujarlas.
         cx1, cx2 = offset_x + round(x1 * scale), offset_x + round(x2 * scale)
         cy1, cy2 = offset_y + round(y1 * scale), offset_y + round(y2 * scale)
         draw.rectangle((cx1, cy1, cx2, cy2), outline="#16A34A", width=2)
@@ -186,7 +182,6 @@ def render_phase1(result: AnalysisResult, image: Image.Image | None = None) -> N
             return
 
         if image is not None:
-            # Lienzo de tamaño fijo con la imagen completa centrada (contain) y cajas dibujadas.
             st.image(
                 _phase1_contain_view(image, objects),
                 caption="Cajas propuestas por Grounding DINO",
@@ -206,8 +201,6 @@ def render_phase2(result: AnalysisResult, image: Image.Image | None = None) -> N
         if image is None:
             st.caption("En cámara en vivo, las cajas se dibujan sobre el video; aquí se detallan sus clasificaciones.")
 
-        # Cuadrícula de dos columnas: dos tarjetas por fila, en el orden original de `objects`.
-        # En pantallas angostas Streamlit apila las columnas, quedando una sola columna.
         for row_start in range(0, len(objects), 2):
             grid_columns = st.columns(2, vertical_alignment="top")
             for offset, grid_column in enumerate(grid_columns):
@@ -222,8 +215,6 @@ def render_phase2(result: AnalysisResult, image: Image.Image | None = None) -> N
                         x1, y1, x2, y2 = (int(value) for value in box)
                         if x2 > x1 and y2 > y1:
                             crop = image.crop((x1, y1, x2, y2))
-                            # Escala única para ancho y alto: mantiene la proporción, respeta ambos
-                            # límites y nunca amplía un recorte pequeño. El recorte no se modifica.
                             scale = min(1.0, _CROP_MAX_WIDTH / crop.width, _CROP_MAX_HEIGHT / crop.height)
                             display_width = max(1, round(crop.width * scale))
                             with st.container(height=_CROP_SLOT_HEIGHT, border=False):
@@ -424,8 +415,7 @@ ui.section_title("Analiza tu residuo", "Sube una fotografía de tus archivos o a
 MODE_FILE = "Subir fotografía"
 MODE_CAMERA = "Cámara en vivo"
 
-# Fila superior: carga/cámara (izquierda) y solo la Fase 1 (derecha). En pantallas angostas
-# Streamlit apila estas dos columnas. La Fase 2 va en una fila inferior a todo el ancho.
+
 col_upload, col_phase1 = st.columns([5, 7], gap="large")
 col_phase2 = st.container()
 
@@ -497,7 +487,7 @@ else:
     st.session_state.live_held = None
     result = st.session_state.result
 
-# Fila superior, columna derecha: SOLO Fase 1 (o el estado vacío correspondiente).
+
 with col_phase1:
     if input_mode == MODE_CAMERA:
         if live_playing:
@@ -515,7 +505,6 @@ with col_phase1:
             ui.empty_state("Aquí aparecerá tu resultado", "Carga una fotografía del residuo para comenzar el análisis.",
                            min_height=300, icon="recycling")
 
-# Fila inferior, ancho completo: Fase 2 (cuadrícula de 2 tarjetas por fila) e información técnica.
 with col_phase2:
     if input_mode == MODE_CAMERA:
         if live_playing:
