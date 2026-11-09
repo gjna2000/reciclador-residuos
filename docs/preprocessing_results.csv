@@ -1,0 +1,26 @@
+﻿imagen,clasificacion_original,bote_original,pipeline_original_ms,clasificacion_preprocesada,bote_preprocesada,pipeline_preprocesada_ms,preprocesado_ms,preprocesada_total_ms,diferencia_ms_preprocesada_menos_original,cambio_status,cambio_clasificacion,cambio_bote
+babana_coffee_sachet_1.jpg,Biological (98.8%),verde,391.381,Biological (99.7%),verde,59.956,756.797,816.753,425.372,False,True,False
+babana_coffee_sachet_2.jpg,No detectado como residuo,—,173.684,No detectado como residuo,—,25.671,77.374,103.045,-70.639,False,False,False
+bag.jpg,Clothes (96.9%),punto-especial,74.32,No detectado como residuo,—,26.052,14.717,40.77,-33.551,True,True,True
+banana_cloth.jpg,Clothes (97.8%),punto-especial,266.07,Clothes (42.8%),—,54.68,81.647,136.328,-129.743,True,True,True
+bed_with_items.jpg,No detectado como residuo,—,77.638,No detectado como residuo,—,25.972,41.496,67.468,-10.17,False,False,False
+bed_with_items_yoshi.jpg,Paper (81.2%),blanco,198.186,Battery (62.1%),punto-especial,68.423,43.939,112.363,-85.824,False,True,True
+bed_with_items_yoshi_hand.jpg,No detectado como residuo,—,79.2,No detectado como residuo,—,26.478,42.661,69.139,-10.061,False,False,False
+blurry.jpg,Paper (99.7%),blanco,68.842,Paper (99.7%),blanco,56.274,11.55,67.824,-1.018,False,False,False
+brocke_pastic_mechanism.jpg,Cardboard (32.5%),—,68.314,Cardboard (98.6%),blanco,58.675,6.424,65.099,-3.215,True,True,True
+cardboard_scrap.jpg,Clothes (99.8%),punto-especial,260.237,Clothes (99.2%),punto-especial,64.125,83.384,147.509,-112.728,False,True,False
+chair_pants.jpg,Clothes (99.7%),punto-especial,152.938,Clothes (40.8%),—,53.68,45.909,99.589,-53.349,True,True,True
+desserts.jpg,Plastic (82.6%),blanco,273.666,Plastic (52.1%),—,67.889,71.991,139.88,-133.787,True,True,True
+disassembled_motorcycle.jpg,Clothes (85.6%),punto-especial,180.257,No detectado como residuo,—,27.936,43.119,71.055,-109.202,True,True,True
+door.jpg,Cardboard (98.4%),blanco,82.734,No detectado como residuo,—,28.783,11.089,39.872,-42.862,True,True,True
+exit_mf.jpeg,No detectado como residuo,—,85.268,No detectado como residuo,—,31.181,46.619,77.8,-7.468,False,False,False
+kitchen.jpg,No detectado como residuo,—,124.856,No detectado como residuo,—,38.439,73.576,112.014,-12.842,False,False,False
+laptop_bed.jpg,Cardboard (96.9%),blanco,163.119,Cardboard (97.3%),blanco,80.576,48.784,129.36,-33.759,False,True,False
+mirror.jpg,No detectado como residuo,—,45.977,No detectado como residuo,—,36.374,11.115,47.489,1.512,False,False,False
+plastic_bag.jpg,Clothes (99.8%),punto-especial,246.186,Clothes (99.1%),punto-especial,71.793,72.702,144.495,-101.692,False,True,False
+plastic_bottle_1.jpg,Plastic (99.7%),blanco,192.772,Plastic (99.7%),blanco,55.401,70.572,125.973,-66.798,False,False,False
+plastic_bottle_2.jpg,Plastic (99.7%),blanco,220.114,Plastic (99.7%),blanco,66.299,75.574,141.873,-78.241,False,False,False
+plastic_bottle_3.jpg,White-Glass (99.6%),blanco,180.885,White-Glass (99.6%),blanco,55.474,72.457,127.931,-52.954,False,False,False
+plastic_cap_1.jpg,Plastic (96.8%),blanco,209.164,Plastic (47.2%),—,63.739,71.472,135.211,-73.953,True,True,True
+plastic_cap_2.jpg,Plastic (96.0%),blanco,171.281,Plastic (92.4%),blanco,52.629,75.673,128.302,-42.979,False,True,False
+post-it_notes.jpg,No detectado como residuo,—,155.282,No detectado como residuo,—,50.656,43.656,94.312,-60.97,False,False,False
