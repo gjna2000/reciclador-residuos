@@ -1,0 +1,10 @@
+image,configuration,threshold,inference_ms,candidate_count,selected_count,label,score,box_xyxy,annotated_image
+kitchen.jpg,configuration_01,0.05,5863.92,161,4,peel,0.1442,"603.0,468.0,766.0,892.0",benchmarks/gdino_calibration_v2_results/kitchen_configuration_01.jpg
+kitchen.jpg,configuration_01,0.05,5863.92,161,4,wrapper,0.1344,"0.0,786.0,135.0,852.0",benchmarks/gdino_calibration_v2_results/kitchen_configuration_01.jpg
+kitchen.jpg,configuration_01,0.05,5863.92,161,4,packaging,0.1213,"1.0,164.0,764.0,740.0",benchmarks/gdino_calibration_v2_results/kitchen_configuration_01.jpg
+kitchen.jpg,configuration_01,0.05,5863.92,161,4,wrapper,0.1118,"486.0,281.0,570.0,347.0",benchmarks/gdino_calibration_v2_results/kitchen_configuration_01.jpg
+kitchen.jpg,configuration_02,0.1,5958.67,22,4,peel,0.1442,"603.0,468.0,766.0,892.0",benchmarks/gdino_calibration_v2_results/kitchen_configuration_02.jpg
+kitchen.jpg,configuration_02,0.1,5958.67,22,4,wrapper,0.1344,"0.0,786.0,135.0,852.0",benchmarks/gdino_calibration_v2_results/kitchen_configuration_02.jpg
+kitchen.jpg,configuration_02,0.1,5958.67,22,4,packaging,0.1213,"1.0,164.0,764.0,740.0",benchmarks/gdino_calibration_v2_results/kitchen_configuration_02.jpg
+kitchen.jpg,configuration_02,0.1,5958.67,22,4,wrapper,0.1118,"486.0,281.0,570.0,347.0",benchmarks/gdino_calibration_v2_results/kitchen_configuration_02.jpg
+kitchen.jpg,configuration_03,0.2,5805.45,0,0,,,,benchmarks/gdino_calibration_v2_results/kitchen_configuration_03.jpg

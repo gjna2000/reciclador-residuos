@@ -1,0 +1,15 @@
+# Aplicación Streamlit y cámara en vivo
+streamlit
+streamlit-webrtc
+av
+opencv-python
+Pillow
+
+# Inferencia de los modelos Hugging Face (CLIP, Grounding DINO y ViT)
+torch
+torchvision
+transformers
+huggingface-hub
+
+# Benchmark experimental detector_filter.py (YOLO-World)
+ultralytics

@@ -70,7 +70,10 @@ El aumento de memoria es coherente con el tamaño del modelo: 85,8 millones de p
 | 2026-11-01 | El dispositivo se elige solo en `src/device.py`; el resto del código lo recibe como parámetro | Evita escribir `"cuda"` a mano en varios archivos y facilita pasar a CPU en otra máquina |
 | 2026-11-01 | Se prueba fp16 y se documenta su descarte | La rúbrica pide declarar los ajustes hechos y explicar los que no se aplicaron |
 | 2026-11-02 | Los nombres de carpetas y archivos van en inglés (`docs/evidence/`) | Consistencia con el resto del repositorio |
-| 2026-11-06 | No se añade preprocesado de imagen al pipeline | Dos variantes (recorte + JPEG, y ajuste con relleno gris) dieron peores resultados que la imagen original en 25 fotos; el procesador del modelo ya redimensiona y normaliza |
+| 2026-11-06 | No se añade preprocesado de imagen al pipeline | La revisión visual encontró resultados de clasificación menos confiables en las variantes de recorte + JPEG y letterbox, aunque sus tiempos totales fueron menores; el procesador del modelo ya redimensiona y normaliza |
+| 2026-11-07 | Se descarta el detector YOLO estándar integrado como detector intermedio | En la prueba de la cáscara con el sachet no detectó el sachet y su modelo `yolo26n.pt` usa un vocabulario fijo; se buscó un detector abierto para encontrar objetos fuera de sus clases |
+| 2026-11-07 | Se adopta Grounding DINO tiny como detector, con la configuración 3 (umbral 0,20; NMS global con IoU 0,5; máximo 4 detecciones; descarta cajas de más del 70 % de la imagen) | Dio los resultados visuales más limpios y menos falsos positivos en las imágenes de prueba; es una selección por inspección visual, no una calibración probabilística |
+| 2026-11-07 | Se descartan la fiabilidad con campana de Gauss y el modelo de lenguaje con prompt maestro | Decisión del equipo por votación |
 
 ---
 
@@ -98,10 +101,31 @@ Rótulos para el README y `docs/cuda.md`:
 
 Las entradas nuevas van arriba.
 
+### 2026-11-08 · Dependencias y arranque local de Streamlit en WSL/Linux
+
+- Qué se hizo: se preparó `requirements.txt` a partir de las dependencias importadas por el proyecto, en vez de copiar el inventario del entorno virtual anterior. Incluye las librerías de Streamlit/cámara, PyTorch/Transformers y las usadas por los benchmarks; `ultralytics` queda por el benchmark `detector_filter.py`, no por el flujo principal.
+- Arranque: `start_app.sh` contiene el flujo portable para Linux y WSL: crea `.venv` si falta, instala o verifica dependencias y ejecuta `python -m streamlit run app.py`. `iniciar_app.bat` solo convierte la ruta de Windows y delega el inicio a ese script dentro de WSL. Ninguno crea, reemplaza ni modifica `app.py`. El entorno local `.venv` se mantiene excluido del control de versiones.
+- Estado: el primer arranque descargará las dependencias y puede tardar; los siguientes solo comprobarán lo declarado antes de iniciar. No se verificó la ejecución en este entorno porque WSL devolvió `E_ACCESSDENIED`. Además, el `app.py` actual de este checkout está vacío; el script lo detecta y se detiene con un mensaje claro hasta que se integre el archivo final. Con el archivo final, falta confirmar en el equipo que PyTorch detecte CUDA.
+- Decisión: subir el archivo de dependencias y el lanzador; no subir el entorno virtual ni la guía de código generada para el repositorio de pruebas.
+
+### 2026-11-07 · Sustitución del YOLO estándar por Grounding DINO y selección de configuración
+
+- Qué se hizo: el detector YOLO estándar integrado (`yolo26n.pt`, de vocabulario fijo) no encontró el sachet en la imagen con la cáscara de plátano. Se probaron detectores de vocabulario abierto para proponer recortes sin depender de una lista fija de clases. Se eligió Grounding DINO (`IDEA-Research/grounding-dino-tiny`, Apache 2.0) y se probaron tres configuraciones de umbral (0,05; 0,10 y 0,20) con `benchmarks/gdino_calibration_v2.py`. La versión 1 aplicaba NMS por etiqueta y dejaba duplicados de la misma región; la versión 2 aplica NMS global, sin separar por etiqueta. El descarte del YOLO estándar no implica descartar YOLO-World, que se probó por separado.
+- Resultado: se seleccionó la configuración 3: umbral 0,20; NMS global con IoU de 0,5; se descartan cajas vacías y cajas que cubren más del 70 % de la imagen; máximo 4 detecciones por imagen; ejecución en GPU. En `babana_coffee_sachet_1.jpg` detectó dos objetos y los clasificó correctamente; en `babana_coffee_sachet_2.jpg` mantuvo las detecciones de la cáscara y el sachet (la configuración 2 añadía un detalle impreso del empaque y un empaque adicional); en `plastic_bag.jpg` detectó la bolsa y evitó cajas dudosas sobre el escritorio y la hoja. También se probó con `exit_mf.jpeg`, `kitchen.jpg`, `disassembled_motorcycle.jpg`, `chair_pants.jpg` y una imagen borrosa.
+- Decisión tomada: se adopta la configuración 3. Es una selección operativa basada en inspección visual, no una calibración probabilística de los puntajes. Un umbral de 0,20 puede descartar objetos reales con puntajes menores; si aparece un caso así, se registra y se reevalúa.
+- Pendiente: medir el tiempo y la memoria de la etapa de detección en CPU y GPU; integrar el detector en el pipeline con Javier.
+
+### 2026-11-07 · Comparación inicial de detectores de vocabulario abierto
+
+- Qué se hizo: se probaron Grounding DINO tiny y OWLv2 base (`google/owlv2-base-patch16-ensemble`) con `babana_coffee_sachet_2.jpg` completa (unos 3048 × 4060 px), con las palabras `trash`, `waste`, `packaging`, `wrapper`, `peel`, `bottle` y `can` y umbral 0,1.
+- Resultado: Grounding DINO tardó 6554 ms, con pico de 1744 MiB y 32 detecciones (puntaje máximo 0,27, varias cajas que cubrían casi toda la foto y la misma caja con varias etiquetas). OWLv2 tardó 10 952 ms, con pico de 771 MiB y 24 detecciones (puntaje máximo 0,38, sin cajas de foto completa).
+- Pendiente: repetir la medición con la foto reducida, porque ambos tiempos corresponden a la imagen completa.
+
 ### 2026-11-06 · Pruebas de preprocesado (sugerencia del profesor)
 
 - Qué se hizo: se probaron dos preprocesados antes del pipeline sobre 25 fotos propias. `preprocessing.py` recortaba la imagen a un cuadrado de 224 × 224 con `ImageOps.fit` y la recodificaba como JPEG con calidad 85. `preprocessing_v2.py` ajustaba la imagen completa dentro de un cuadrado de 224 × 224 conservando la proporción, rellenando con gris neutro, sin recortar ni comprimir.
-- Resultado: en estas 25 fotos, la imagen original dio mejores resultados que las dos variantes (aciertos: original __ de 25, v1 __ de 25, v2 __ de 25).
+- Resultado: no se proporcionaron etiquetas reales para las 25 fotos, por lo que no se puede calcular una cantidad objetiva de aciertos. La v1 coincidió con la salida original (estado, clase y bote) en 11 de 25 fotos. La v2 coincidió en clase y bote en 16 de 25; el CSV no contiene etiquetas reales. En la revisión visual se consideró más confiable la salida original.
+- Tiempos promedio registrados: v1, original 165,69 ms y preprocesada total 129,66 ms (36,04 ms menos); v2, original 166,80 ms y letterbox total 120,29 ms (46,50 ms menos). Aunque las variantes redujeron el tiempo total medido, los cambios de clasificación no justificaron añadirlas al pipeline.
 - Hallazgo: según la configuración del procesador del modelo, este ya redimensiona a 224 × 224 (bilinear) y normaliza con media 0,5 y desviación 0,5 por canal, sin recorte central ni recodificación. Las variantes añadían transformaciones que no forman parte de la receta del modelo.
 - Decisión tomada: no se añade preprocesado al pipeline.
 - Pendiente: verificar la configuración imprimiendo el procesador; documentar este resultado en `docs/cuda.md` y en la ficha del modelo.
@@ -159,14 +183,21 @@ Las entradas nuevas van arriba.
 - [x] Escribir `docs/cuda.md` con nuestras palabras: qué corre en el host, qué en el device y cómo viajan los datos (fecha límite: sábado 7 de noviembre)
 - [ ] Preparar la explicación para la sustentación: 2 minutos sobre CUDA y la comparación CPU contra GPU
 - [x] Tomar las capturas del pipeline completo (tabla de la segunda ejecución y `nvidia-smi` con `--runs 300 --gpu-only`) y guardarlas en `docs/evidence/` con el prefijo `pipeline_`
-- [ ] Probar la hipótesis del preprocesado en CPU del filtro con la imagen reducida a 448 × 448 y registrar el resultado
+- [x] Ejecutar la prueba de la hipótesis del preprocesado en CPU del filtro con la imagen reducida a 448 × 448
+- [ ] Recuperar e incorporar el resultado numérico de esa prueba a la bitácora
 - [ ] Añadir la tabla del pipeline completo a `docs/cuda.md`
-- [x] Preprocesado (sugerencia del profesor): crear `src/preprocess.py` y comparar con y sin él sobre las fotos propias de Aura
-- [x] Fiabilidad con campana de Gauss (sugerencia del profesor): apoyar a Aura con el puntaje z sobre los logits (descartado por decicion popular)
-- [x] Modelo de lenguaje con prompt maestro (sugerencia del profesor): confirmar el modelo con el equipo y medir la memoria de la GPU de cada modelo (ViT, CLIP y LLM) para decidir entre fp16, cuantización o CPU (descartado por decicion popular)
+- [x] Preprocesado (sugerencia del profesor): comparar variantes con las fotos propias; se decidió no añadir `src/preprocess.py` ni preprocesado al pipeline porque la salida original fue más confiable
+- [x] Fiabilidad con campana de Gauss (sugerencia del profesor): se evaluó el puntaje z sobre los logits; se descartó implementarlo por decisión del equipo
+- [x] Modelo de lenguaje con prompt maestro (sugerencia del profesor): se evaluó como alternativa; se descartó por decisión del equipo, sin integrarlo ni medir memoria de GPU para ese modelo
 - [ ] Acordar con Javier el cambio del contrato (campos opcionales en `AnalysisResult`) y las claves de `timings_ms`
-- [x] Repetir el benchmark del pipeline completo después de añadir el preprocesado y el modelo de lenguaje(descartado por decicion popular, viva la democracia :D)
+- [x] Evaluar repetir el benchmark del pipeline completo con preprocesado y modelo de lenguaje; se descartó esa variante por decisión del equipo
 - [ ] Probar el plan B en Colab o Kaggle antes de la sustentación
+- [x] Probar detectores alternativos (Grounding DINO tiny, OWLv2) y decidir: se adopta Grounding DINO tiny con la configuración 3
+- [ ] Medir el tiempo y la memoria de la etapa de detección en CPU y GPU, e incluirlos en el benchmark del pipeline completo y en `docs/cuda.md`
+- [ ] Verificar la memoria de la GPU con los tres modelos cargados (Grounding DINO, CLIP y ViT)
+- [ ] Acordar con Javier cómo se integra el detector en `pipeline.py` (recortes, Gate y clasificador por objeto) y el cambio de `AnalysisResult` para varios objetos por imagen
+- [ ] Documentar Grounding DINO tiny en `docs/cuda.md` y en la ficha del modelo (criterio 1): parámetros, quién lo publicó, licencia, por qué se eligió frente a OWLv2 y YOLO, y ajustes (umbral y NMS)
+- [ ] Utilizar el caso del sachet y el límite del umbral 0,20 (puede omitir objetos reales) como casos límite en `docs/cuda.md` y en la sustentación
 
 ---
 
