@@ -101,6 +101,13 @@ Rótulos para el README y `docs/cuda.md`:
 
 Las entradas nuevas van arriba.
 
+### 2026-11-08 · Dependencias y arranque local de Streamlit en WSL/Linux
+
+- Qué se hizo: se preparó `requirements.txt` a partir de las dependencias importadas por el proyecto, en vez de copiar el inventario del entorno virtual anterior. Incluye las librerías de Streamlit/cámara, PyTorch/Transformers y las usadas por los benchmarks; `ultralytics` queda por el benchmark `detector_filter.py`, no por el flujo principal.
+- Arranque: `start_app.sh` contiene el flujo portable para Linux y WSL: crea `.venv` si falta, instala o verifica dependencias y ejecuta `python -m streamlit run app.py`. `iniciar_app.bat` solo convierte la ruta de Windows y delega el inicio a ese script dentro de WSL. Ninguno crea, reemplaza ni modifica `app.py`. El entorno local `.venv` se mantiene excluido del control de versiones.
+- Estado: el primer arranque descargará las dependencias y puede tardar; los siguientes solo comprobarán lo declarado antes de iniciar. No se verificó la ejecución en este entorno porque WSL devolvió `E_ACCESSDENIED`. Además, el `app.py` actual de este checkout está vacío; el script lo detecta y se detiene con un mensaje claro hasta que se integre el archivo final. Con el archivo final, falta confirmar en el equipo que PyTorch detecte CUDA.
+- Decisión: subir el archivo de dependencias y el lanzador; no subir el entorno virtual ni la guía de código generada para el repositorio de pruebas.
+
 ### 2026-11-07 · Sustitución del YOLO estándar por Grounding DINO y selección de configuración
 
 - Qué se hizo: el detector YOLO estándar integrado (`yolo26n.pt`, de vocabulario fijo) no encontró el sachet en la imagen con la cáscara de plátano. Se probaron detectores de vocabulario abierto para proponer recortes sin depender de una lista fija de clases. Se eligió Grounding DINO (`IDEA-Research/grounding-dino-tiny`, Apache 2.0) y se probaron tres configuraciones de umbral (0,05; 0,10 y 0,20) con `benchmarks/gdino_calibration_v2.py`. La versión 1 aplicaba NMS por etiqueta y dejaba duplicados de la misma región; la versión 2 aplica NMS global, sin separar por etiqueta. El descarte del YOLO estándar no implica descartar YOLO-World, que se probó por separado.
@@ -176,13 +183,14 @@ Las entradas nuevas van arriba.
 - [x] Escribir `docs/cuda.md` con nuestras palabras: qué corre en el host, qué en el device y cómo viajan los datos (fecha límite: sábado 7 de noviembre)
 - [ ] Preparar la explicación para la sustentación: 2 minutos sobre CUDA y la comparación CPU contra GPU
 - [x] Tomar las capturas del pipeline completo (tabla de la segunda ejecución y `nvidia-smi` con `--runs 300 --gpu-only`) y guardarlas en `docs/evidence/` con el prefijo `pipeline_`
-- [ ] Probar la hipótesis del preprocesado en CPU del filtro con la imagen reducida a 448 × 448 y registrar el resultado
+- [x] Ejecutar la prueba de la hipótesis del preprocesado en CPU del filtro con la imagen reducida a 448 × 448
+- [ ] Recuperar e incorporar el resultado numérico de esa prueba a la bitácora
 - [ ] Añadir la tabla del pipeline completo a `docs/cuda.md`
-- [x] Preprocesado (sugerencia del profesor): crear `src/preprocess.py` y comparar con y sin él sobre las fotos propias de Aura
-- [x] Fiabilidad con campana de Gauss (sugerencia del profesor): apoyar a Aura con el puntaje z sobre los logits (descartado por decicion popular)
-- [x] Modelo de lenguaje con prompt maestro (sugerencia del profesor): confirmar el modelo con el equipo y medir la memoria de la GPU de cada modelo (ViT, CLIP y LLM) para decidir entre fp16, cuantización o CPU (descartado por decicion popular)
+- [x] Preprocesado (sugerencia del profesor): comparar variantes con las fotos propias; se decidió no añadir `src/preprocess.py` ni preprocesado al pipeline porque la salida original fue más confiable
+- [x] Fiabilidad con campana de Gauss (sugerencia del profesor): se evaluó el puntaje z sobre los logits; se descartó implementarlo por decisión del equipo
+- [x] Modelo de lenguaje con prompt maestro (sugerencia del profesor): se evaluó como alternativa; se descartó por decisión del equipo, sin integrarlo ni medir memoria de GPU para ese modelo
 - [ ] Acordar con Javier el cambio del contrato (campos opcionales en `AnalysisResult`) y las claves de `timings_ms`
-- [x] Repetir el benchmark del pipeline completo después de añadir el preprocesado y el modelo de lenguaje(descartado por decicion popular, viva la democracia :D)
+- [x] Evaluar repetir el benchmark del pipeline completo con preprocesado y modelo de lenguaje; se descartó esa variante por decisión del equipo
 - [ ] Probar el plan B en Colab o Kaggle antes de la sustentación
 - [x] Probar detectores alternativos (Grounding DINO tiny, OWLv2) y decidir: se adopta Grounding DINO tiny con la configuración 3
 - [ ] Medir el tiempo y la memoria de la etapa de detección en CPU y GPU, e incluirlos en el benchmark del pipeline completo y en `docs/cuda.md`
