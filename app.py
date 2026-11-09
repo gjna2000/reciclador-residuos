@@ -1,4 +1,5 @@
 import logging
+import io
 import threading
 from dataclasses import fields
 
@@ -44,6 +45,14 @@ def load_camera_runtime():
 def load_pipeline_lock():
     """Comparte un lock para que las sesiones no usen la GPU simultáneamente."""
     return threading.Lock()
+
+
+@st.cache_resource(show_spinner=False)
+def load_pipeline(_gate, _detector, _classifier):
+    """Conserva una sola instancia del pipeline entre reruns de Streamlit."""
+    from src.pipeline import RecyclingPipeline
+
+    return RecyclingPipeline(gate=_gate, detector=_detector, classifier=_classifier)
 
 
 @st.cache_resource(show_spinner=False)
@@ -125,13 +134,16 @@ def _signature(result):
     return (result.status, result.bin, top_label)
 
 
-_CROP_MAX_WIDTH = 260  
-_CROP_MAX_HEIGHT = 240 
-_CROP_SLOT_HEIGHT = 300  
+# Límites SOLO de visualización para los recortes de la Fase 2 (no afectan lo que recibe ViT).
+_CROP_MAX_WIDTH = 260   # px máximos de ancho mostrado
+_CROP_MAX_HEIGHT = 240  # px máximos de alto mostrado (evita recortes verticales muy altos)
+_CROP_SLOT_HEIGHT = 300  # alto fijo del espacio de la imagen (recorte + leyenda) para equilibrar tarjetas
 
-
-_PHASE1_CANVAS = (560, 320)         
-_PHASE1_BG = (241, 245, 249)       
+# Lienzo de tamaño fijo para la imagen original de la Fase 1 (solo visualización).
+# La imagen se escala con proporción original dentro de este lienzo (equivale a `object-fit: contain`)
+# y se centra; así imágenes verticales, horizontales y cuadradas ocupan siempre el mismo espacio.
+_PHASE1_CANVAS = (560, 320)          # (ancho, alto) en px del lienzo mostrado
+_PHASE1_BG = (241, 245, 249)         # fondo neutro del lienzo (franjas del «contain»)
 
 
 def _phase1_contain_view(image: Image.Image, objects: list) -> Image.Image:
@@ -157,6 +169,7 @@ def _phase1_contain_view(image: Image.Image, objects: list) -> Image.Image:
         x1, y1, x2, y2 = (int(value) for value in box)
         x1, x2 = max(0, min(x1, width - 1)), max(0, min(x2, width - 1))
         y1, y2 = max(0, min(y1, height - 1)), max(0, min(y2, height - 1))
+        # Mismas cajas, solo convertidas a la escala y posición del lienzo para dibujarlas.
         cx1, cx2 = offset_x + round(x1 * scale), offset_x + round(x2 * scale)
         cy1, cy2 = offset_y + round(y1 * scale), offset_y + round(y2 * scale)
         draw.rectangle((cx1, cy1, cx2, cy2), outline="#16A34A", width=2)
@@ -182,6 +195,7 @@ def render_phase1(result: AnalysisResult, image: Image.Image | None = None) -> N
             return
 
         if image is not None:
+            # Lienzo de tamaño fijo con la imagen completa centrada (contain) y cajas dibujadas.
             st.image(
                 _phase1_contain_view(image, objects),
                 caption="Cajas propuestas por Grounding DINO",
@@ -201,6 +215,8 @@ def render_phase2(result: AnalysisResult, image: Image.Image | None = None) -> N
         if image is None:
             st.caption("En cámara en vivo, las cajas se dibujan sobre el video; aquí se detallan sus clasificaciones.")
 
+        # Cuadrícula de dos columnas: dos tarjetas por fila, en el orden original de `objects`.
+        # En pantallas angostas Streamlit apila las columnas, quedando una sola columna.
         for row_start in range(0, len(objects), 2):
             grid_columns = st.columns(2, vertical_alignment="top")
             for offset, grid_column in enumerate(grid_columns):
@@ -215,6 +231,8 @@ def render_phase2(result: AnalysisResult, image: Image.Image | None = None) -> N
                         x1, y1, x2, y2 = (int(value) for value in box)
                         if x2 > x1 and y2 > y1:
                             crop = image.crop((x1, y1, x2, y2))
+                            # Escala única para ancho y alto: mantiene la proporción, respeta ambos
+                            # límites y nunca amplía un recorte pequeño. El recorte no se modifica.
                             scale = min(1.0, _CROP_MAX_WIDTH / crop.width, _CROP_MAX_HEIGHT / crop.height)
                             display_width = max(1, round(crop.width * scale))
                             with st.container(height=_CROP_SLOT_HEIGHT, border=False):
@@ -319,6 +337,8 @@ st.session_state.setdefault("uploader_key", 0)
 st.session_state.setdefault("result", None)
 st.session_state.setdefault("file_id", None)
 st.session_state.setdefault("loaded_image", None)
+st.session_state.setdefault("loaded_preview", None)
+st.session_state.setdefault("uploaded_image_bytes", None)
 st.session_state.setdefault("live_holder", LiveHolder())
 st.session_state.setdefault("live_held", None)
 
@@ -328,13 +348,30 @@ def reset_analysis() -> None:
     st.session_state.result = None
     st.session_state.file_id = None
     st.session_state.loaded_image = None
+    st.session_state.loaded_preview = None
+    st.session_state.uploaded_image_bytes = None
 
 
-def load_image(uploaded) -> Image.Image | None:
-    if uploaded is None:
+def load_image(image_bytes: bytes, *, preview: bool = False) -> Image.Image | None:
+    if not image_bytes:
         return None
     try:
-        return ImageOps.exif_transpose(Image.open(uploaded)).convert("RGB")
+        with Image.open(io.BytesIO(image_bytes)) as opened:
+            original_size = opened.size
+            orientation = opened.getexif().get(274)
+            if orientation in (5, 6, 7, 8):
+                original_size = (original_size[1], original_size[0])
+            # JPEG permite decodificar una versión reducida para la vista previa.
+            # El análisis siempre abre el original y conserva toda su resolución.
+            if preview:
+                opened.draft("RGB", (900, 900))
+                # Reducir antes de convertir a RGB evita crear una copia RGB grande.
+                opened.thumbnail((900, 900), Image.BILINEAR)
+            oriented = ImageOps.exif_transpose(opened)
+            image = oriented.convert("RGB")
+            if preview:
+                image.info["original_size"] = original_size
+            return image
     except (UnidentifiedImageError, OSError, ValueError):
         st.error("No se pudo leer el archivo. Verifica que sea una imagen JPG, JPEG o PNG válida.")
         return None
@@ -382,13 +419,7 @@ with startup.container():
         warmup_models(gate, detector, classifier)
 
         startup_progress.progress(94, text="Preparando el pipeline...")
-        from src.pipeline import RecyclingPipeline
-
-        pipeline = RecyclingPipeline(
-            gate=gate,
-            detector=detector,
-            classifier=classifier,
-        )
+        pipeline = load_pipeline(gate, detector, classifier)
         pipeline_lock = load_pipeline_lock()
         startup_progress.progress(100, text="Todo está listo")
         startup_detail.success("Modelos cargados. Abriendo la aplicación...")
@@ -415,7 +446,8 @@ ui.section_title("Analiza tu residuo", "Sube una fotografía de tus archivos o a
 MODE_FILE = "Subir fotografía"
 MODE_CAMERA = "Cámara en vivo"
 
-
+# Fila superior: carga/cámara (izquierda) y solo la Fase 1 (derecha). En pantallas angostas
+# Streamlit apila estas dos columnas. La Fase 2 va en una fila inferior a todo el ancho.
 col_upload, col_phase1 = st.columns([5, 7], gap="large")
 col_phase2 = st.container()
 
@@ -440,25 +472,30 @@ with col_upload:
                                         label_visibility="collapsed")
             file_id = uploaded.file_id if hasattr(uploaded, "file_id") and uploaded is not None else (uploaded.name if uploaded is not None else None)
             if file_id != st.session_state.file_id or (
-                uploaded is not None and st.session_state.loaded_image is None
+                uploaded is not None and st.session_state.loaded_preview is None
             ):
                 st.session_state.file_id = file_id
                 st.session_state.result = None
                 if uploaded is None:
                     st.session_state.loaded_image = None
+                    st.session_state.loaded_preview = None
+                    st.session_state.uploaded_image_bytes = None
                 else:
+                    st.session_state.uploaded_image_bytes = uploaded.getvalue()
+                    st.session_state.loaded_image = None
                     with st.spinner("Preparando la imagen para mostrarla y analizarla..."):
-                        st.session_state.loaded_image = load_image(uploaded)
-            image = st.session_state.loaded_image
+                        st.session_state.loaded_preview = load_image(
+                            st.session_state.uploaded_image_bytes, preview=True
+                        )
+            preview = st.session_state.loaded_preview
 
-            if image is not None:
-                preview = image.copy()
-                preview.thumbnail((900, 900))
+            if preview is not None:
                 st.image(preview)
-                st.caption(f"Imagen lista: {image.width} × {image.height} px")
+                original_width, original_height = preview.info.get("original_size", preview.size)
+                st.caption(f"Imagen lista: {original_width} × {original_height} px")
 
             c_analyze, c_clear = st.columns([3, 2])
-            analyze_clicked = c_analyze.button("Analizar residuo", type="primary", disabled=image is None)
+            analyze_clicked = c_analyze.button("Analizar residuo", type="primary", disabled=preview is None)
             c_clear.button("Limpiar", on_click=reset_analysis, disabled=uploaded is None)
         else:
 
@@ -466,8 +503,13 @@ with col_upload:
             live_playing = bool(live_ctx is not None and live_ctx.state.playing)
             st.caption("Permite el acceso a la cámara y pulsa START. El análisis se actualiza de forma continua.")
 
-    if analyze_clicked and image is not None:
+    if analyze_clicked and preview is not None:
         try:
+            with st.spinner("Preparando la imagen original..."):
+                image = st.session_state.loaded_image
+                if image is None:
+                    image = load_image(st.session_state.uploaded_image_bytes)
+                    st.session_state.loaded_image = image
             with st.spinner("Analizando con modelo de visión IA..."):
                 st.session_state.result = file_analyzer(image)
         except Exception as error:
@@ -486,8 +528,9 @@ else:
     live_holder.set(None)
     st.session_state.live_held = None
     result = st.session_state.result
+    image = st.session_state.loaded_image or st.session_state.loaded_preview
 
-
+# Fila superior, columna derecha: SOLO Fase 1 (o el estado vacío correspondiente).
 with col_phase1:
     if input_mode == MODE_CAMERA:
         if live_playing:
@@ -505,6 +548,7 @@ with col_phase1:
             ui.empty_state("Aquí aparecerá tu resultado", "Carga una fotografía del residuo para comenzar el análisis.",
                            min_height=300, icon="recycling")
 
+# Fila inferior, ancho completo: Fase 2 (cuadrícula de 2 tarjetas por fila) e información técnica.
 with col_phase2:
     if input_mode == MODE_CAMERA:
         if live_playing:
