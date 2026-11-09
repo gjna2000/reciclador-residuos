@@ -371,6 +371,18 @@ def get_local_image_base64(filepath: Path, max_px: int = 720) -> str | None:
     return None
 
 
+def preload_category_images(max_px: int = 560) -> tuple[int, int]:
+    """Prepara en caché las imágenes locales que aparecen en las tarjetas."""
+    filenames = [item.get("filename", "") for item in CATEGORY_DETAILS.values()]
+    total = len(filenames)
+    loaded = sum(
+        get_local_image_base64(ASSETS_DIR / filename, max_px=max_px) is not None
+        for filename in filenames
+        if filename
+    )
+    return loaded, total
+
+
 def render_header() -> None:
     _md(f"""
         <header class="eco-header">
@@ -462,29 +474,70 @@ def render_footer() -> None:
 # Resultado
 # ---------------------------------------------------------------------------
 
+# Refinamiento visual SOLO de `result_card` (Fases 1 y 2). Todas las reglas están acotadas al
+# contenedor `st-key-result_card*`, por lo que no afectan a bins_overview, category_cards_grid
+# ni a ningún otro componente. Se evita tocar `opacity` / `transform` de los elementos animados.
+_RESULT_CARD_CSS = """<style>
+div[class*="st-key-result_card"]{background:#FBFDFC;border:1px solid rgba(14,59,46,.09);border-radius:1.15rem;box-shadow:0 1px 3px rgba(14,59,46,.04),0 8px 20px -10px rgba(14,59,46,.10);padding:1.25rem 1.25rem 1.25rem 1.5rem;}
+div[class*="st-key-result_card"][class*="_crop_"]{background:#F7FBF8;border-color:rgba(22,163,74,.12);box-shadow:none;}
+div[class*="st-key-result_card"][class*="_crop_"] .eco-metric{background:rgba(255,255,255,.8);}
+[data-testid="stVerticalBlockBorderWrapper"]:has(div[class*="st-key-result_card"]){border-color:rgba(14,59,46,.10);border-radius:1.25rem;}
+div[class*="st-key-result_card"] .eco-binbar{width:5px;border-right:0;}
+div[class*="st-key-result_card"] .eco-res-head{align-items:center;flex-wrap:wrap;gap:.6rem .75rem;margin-bottom:1rem;padding-bottom:.85rem;border-bottom:1px solid rgba(14,59,46,.07);}
+div[class*="st-key-result_card"] .eco-eyebrow{font-size:10.5px;font-weight:600;letter-spacing:.07em;color:#6F8178;}
+div[class*="st-key-result_card"] .eco-res-title{font-size:1.5rem;line-height:1.18;margin-top:.2rem;}
+div[class*="st-key-result_card"] .eco-pill{font-weight:600;padding:.3rem .8rem;}
+div[class*="st-key-result_card"] .eco-pill-ok{background:#E4F5EA;color:#1B6B3A;border-color:rgba(22,163,74,.18);}
+div[class*="st-key-result_card"] .eco-pill-warn{background:#FEF5DC;color:#A5620F;border-color:rgba(217,119,6,.20);}
+div[class*="st-key-result_card"] .eco-pill-neutral{background:#EEF2EF;color:#4B5A52;border-color:rgba(14,59,46,.12);}
+div[class*="st-key-result_card"] .eco-stage{background:linear-gradient(180deg,#F8FBF9,#EEF6F1);border:1px solid rgba(14,59,46,.07);border-radius:1rem;margin-bottom:1rem;}
+div[class*="st-key-result_card"] .eco-stage-head{border-bottom-color:rgba(14,59,46,.06);color:var(--forest-mid);font-weight:600;}
+div[class*="st-key-result_card"] .eco-stage svg{filter:drop-shadow(0 5px 7px rgba(14,59,46,.10));}
+div[class*="st-key-result_card"] .eco-bin-dot,div[class*="st-key-result_card"] .eco-bin-row .sw{border:1px solid rgba(14,59,46,.18);box-shadow:inset 0 1px 2px rgba(0,0,0,.05);}
+div[class*="st-key-result_card"] .eco-toast{background:#E6F5EC;color:#166534;font-weight:600;border:1px solid rgba(22,163,74,.20);box-shadow:0 4px 12px -6px rgba(14,59,46,.18);}
+div[class*="st-key-result_card"] .eco-metrics{gap:.75rem;margin-bottom:1rem;}
+div[class*="st-key-result_card"] .eco-metric{background:#F6FAF8;border:1px solid rgba(14,59,46,.07);border-radius:.85rem;}
+div[class*="st-key-result_card"] .eco-metric .lbl{color:#6B7B73;}
+div[class*="st-key-result_card"] .eco-meter{background:#E6EFEA;}
+div[class*="st-key-result_card"] .eco-tip{background:linear-gradient(135deg,#F5FBF7,#EBF5EF);border:1px solid rgba(22,163,74,.16);border-radius:.9rem;padding:.9rem 1rem;margin-bottom:.25rem;}
+div[class*="st-key-result_card"] .eco-tip .ic{border-radius:.6rem;box-shadow:0 2px 6px -2px rgba(22,163,74,.35);}
+div[class*="st-key-result_card"] .eco-preds-title{border-top-color:rgba(14,59,46,.06);}
+div[class*="st-key-result_card"] .eco-pred .bar{background:#E8F0EB;}
+div[class*="st-key-result_card"] .eco-pred .bar>div{background:#C4D4CA;}
+div[class*="st-key-result_card"] .eco-pred.top .bar>div{background:var(--eco-green);}
+</style>"""
+
+
+def _soft_bar_style(color: str) -> str:
+    """Estilo del acento lateral de la tarjeta: mismo color del contenedor, más suave.
+    Los colores claros (caneca blanca) conservan su tono y reciben solo un borde interior tenue."""
+    if _is_light(color):
+        return f"background:{color};box-shadow:inset -1px 0 0 rgba(14,59,46,.10)"
+    return f"background:{_tint(color, 0.18)}"
+
 def _bin_svg(color: str) -> str:
     light = _is_light(color)
-    stroke = "#94A3B8" if light else _shade(color, 0.7)
-    rim = "#E2E8F0" if light else _shade(color, 0.85)
-    stripe = "#E2E8F0" if light else _tint(color, 0.22)
-    handle = "#64748B" if light else _shade(color, 0.6)
+    stroke = "#CBD5E1" if light else _shade(color, 0.88)
+    rim = "#E8EEF3" if light else _shade(color, 0.92)
+    stripe = "#E8EEF3" if light else _tint(color, 0.22)
+    handle = "#94A3B8" if light else _shade(color, 0.78)
     return (
         '<svg viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Caneca de separación">'
         '<ellipse cx="100" cy="202" rx="55" ry="8" fill="#111e19" opacity="0.12"/>'
         '<g class="eco-item">'
-        '<circle cx="100" cy="44" r="18" fill="#E6F7F0" stroke="#164E3F" stroke-width="1.5"/>'
-        '<rect x="96" y="30" width="8" height="5" rx="1.5" fill="#164E3F"/>'
-        '<rect x="92" y="35" width="16" height="18" rx="4" fill="#164E3F" opacity="0.85"/>'
+        '<circle cx="100" cy="44" r="18" fill="#E6F7F0" stroke="#5E9C85" stroke-width="1.25"/>'
+        '<rect x="96" y="30" width="8" height="5" rx="1.5" fill="#2F6F5B"/>'
+        '<rect x="92" y="35" width="16" height="18" rx="4" fill="#2F6F5B" opacity="0.8"/>'
         '</g>'
-        f'<path d="M 65 92 L 72 195 C 73 199 78 202 84 202 L 116 202 C 122 202 127 199 128 195 L 135 92 Z" fill="{color}" stroke="{stroke}" stroke-width="2.5"/>'
+        f'<path d="M 65 92 L 72 195 C 73 199 78 202 84 202 L 116 202 C 122 202 127 199 128 195 L 135 92 Z" fill="{color}" stroke="{stroke}" stroke-width="1.5"/>'
         f'<path d="M 74 100 L 78 192 M 126 100 L 122 192" stroke="{stripe}" stroke-linecap="round" stroke-width="1.5" fill="none"/>'
-        '<rect x="82" y="128" width="36" height="36" rx="6" fill="#FFFFFF" opacity="0.93" stroke="#CBD5E1"/>'
+        '<rect x="82" y="128" width="36" height="36" rx="6" fill="#FFFFFF" opacity="0.93" stroke="#DDE6E0"/>'
         f'<g transform="translate(82 128) scale(0.75)">{_LEAF_PATHS}</g>'
-        f'<rect x="60" y="84" width="80" height="9" rx="4.5" fill="{rim}" stroke="{stroke}" stroke-width="1.5"/>'
+        f'<rect x="60" y="84" width="80" height="9" rx="4.5" fill="{rim}" stroke="{stroke}" stroke-width="1"/>'
         '<g class="eco-lid">'
-        f'<path d="M 62 82 C 65 72 135 72 138 82 Z" fill="{color}" stroke="{stroke}" stroke-width="2"/>'
+        f'<path d="M 62 82 C 65 72 135 72 138 82 Z" fill="{color}" stroke="{stroke}" stroke-width="1.25"/>'
         f'<rect x="92" y="66" width="16" height="6" rx="3" fill="{handle}"/>'
-        f'<path d="M 60 81 L 140 81" stroke="{stroke}" stroke-linecap="round" stroke-width="3"/>'
+        f'<path d="M 60 81 L 140 81" stroke="{stroke}" stroke-linecap="round" stroke-width="2"/>'
         '</g>'
         '</svg>'
     )
@@ -503,20 +556,31 @@ def top_predictions(predictions, heading: str) -> None:
     _md(f'<div class="eco-preds-title"><span>{heading}</span></div>' + "".join(rows))
 
 
-def _replay_animation() -> None:
-    st.session_state["eco_anim_tick"] = st.session_state.get("eco_anim_tick", 0) + 1
+def _replay_animation(key_suffix: str) -> None:
+    tick_key = f"eco_anim_tick_{key_suffix}"
+    st.session_state[tick_key] = st.session_state.get(tick_key, 0) + 1
+    st.session_state[f"eco_anim_replay_{key_suffix}"] = True
 
 
-def result_card(result) -> None:
+def result_card(result, key_suffix: str = "main") -> None:
     pill, css = STATUS_STYLE.get(result.status, STATUS_STYLE["incierto"])
     ss = st.session_state
+    tick_key = f"eco_anim_tick_{key_suffix}"
+    replay_key = f"eco_anim_replay_{key_suffix}"
+    signature_key = f"_eco_anim_signature_{key_suffix}"
+    signature = (
+        result.status,
+        result.bin,
+        result.top[0].label if result.top else None,
+    )
 
-    if ss.get("_eco_anim_for") is not result:
-        ss["_eco_anim_for"] = result
-        ss["eco_anim_tick"] = ss.get("eco_anim_tick", 0) + 1
-    tick = ss.get("eco_anim_tick", 0)
+    if ss.get(signature_key) != signature:
+        ss[signature_key] = signature
+        ss[tick_key] = ss.get(tick_key, 0) + 1
+        ss[replay_key] = False
+    tick = ss.get(tick_key, 0)
 
-    with st.container(key=f"result_card_{css}"):
+    with st.container(key=f"result_card_{css}_{key_suffix}"):
         if result.status == "reciclable" and result.top:
             best = result.top[0]
             # Solo el nombre para mostrar sale de CATEGORY_DETAILS; contenedor y consejo salen del resultado.
@@ -535,7 +599,7 @@ def result_card(result) -> None:
                         <span class="eco-bin-dot" style="background:{color}"></span>
                         <span>{rbin["heading"]}</span>
                       </div>
-                      <div class="eco-stage-body eco-anim-{tick % 2}">
+                      <div class="eco-stage-body eco-anim-{tick % 2}{' eco-replay' if ss.get(replay_key) else ''}">
                         {_bin_svg(color)}
                         <div class="eco-toast">{_icon("verified")}<span>Entrega en {destino}</span></div>
                       </div>
@@ -557,7 +621,8 @@ def result_card(result) -> None:
                 """
 
             _md(f"""
-                <div class="eco-binbar" style="background:{color}"></div>
+                {_RESULT_CARD_CSS}
+                <div class="eco-binbar" style="{_soft_bar_style(color)}"></div>
                 <div class="eco-res-head">
                   <div>
                     <div class="eco-eyebrow">Norma técnica Colombia (Res. 2184)</div>
@@ -569,7 +634,13 @@ def result_card(result) -> None:
             """)
 
             if rbin:
-                st.button("Animar depósito", key="replay_anim", on_click=_replay_animation, type="secondary")
+                st.button(
+                    "Animar depósito",
+                    key=f"replay_anim_{key_suffix}",
+                    on_click=_replay_animation,
+                    args=(key_suffix,),
+                    type="secondary",
+                )
 
             _md(f"""
                 <div class="eco-metrics">
@@ -593,6 +664,7 @@ def result_card(result) -> None:
             title = "La imagen no parece un residuo" if result.status == "no_es_residuo" else "Resultado incierto"
             icon = "image_search" if result.status == "no_es_residuo" else "help"
             _md(f"""
+                {_RESULT_CARD_CSS}
                 <div class="eco-res-head">
                   <div>
                     <div class="eco-eyebrow">Norma técnica Colombia (Res. 2184)</div>
@@ -600,8 +672,8 @@ def result_card(result) -> None:
                   </div>
                   <span class="eco-pill eco-pill-{css}">{pill}</span>
                 </div>
-                <div class="eco-tip">
-                  <div class="ic" style="background:#B45309">{_icon(icon, 20)}</div>
+                <div class="eco-tip" style="background:linear-gradient(135deg,#FFFBEF,#FEF4DA);border-color:rgba(217,119,6,.20)">
+                  <div class="ic" style="background:#D9902F;box-shadow:0 2px 6px -2px rgba(217,119,6,.35)">{_icon(icon, 20)}</div>
                   <div><b>Sugerencia</b><p>{result.tip}</p></div>
                 </div>
             """)

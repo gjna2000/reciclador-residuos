@@ -998,9 +998,9 @@ footer {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .eco-lid,
-    .eco-item,
-    .eco-toast {
+    .eco-stage-body:not(.eco-replay) .eco-lid,
+    .eco-stage-body:not(.eco-replay) .eco-item,
+    .eco-stage-body:not(.eco-replay) .eco-toast {
         animation: none !important;
     }
     .eco-toast {
@@ -1880,5 +1880,64 @@ footer {
 @media (max-width: 760px) {
     .eco-bins {
         grid-template-columns: 1fr;
+    }
+}
+
+
+/* ==========================================================================
+   FASE 1 (Grounding DINO) y FASE 2 (ViT) · SOLO contenedores exteriores
+   --------------------------------------------------------------------------
+   Requieren en app.py:  st.container(key="phase1_card")
+                         st.container(key="phase2_section")
+   Ambos son contenedores SIN border=True (igual que upload_card y result_card),
+   de modo que la clase .st-key-<key> queda en el unico bloque visible y no hay
+   un segundo borde nativo de Streamlit debajo.
+   Mismo lenguaje que .cat-card (Categorias): fondo blanco, borde
+   rgba(14,59,46,.08), radio 1rem y var(--shadow-card).
+   NO se tocan las tarjetas internas "Residuo N" (st.container(border=True)),
+   ni result_card, ni titulos, metricas, imagenes o leyendas.
+   ========================================================================== */
+
+.stApp .st-key-phase1_card,
+.stApp .st-key-phase2_section {
+    background: #fff;
+    border: 1px solid rgba(14, 59, 46, 0.08);
+    border-radius: 1rem;
+    box-shadow: var(--shadow-card);
+    padding: 1.25rem;
+}
+
+.stApp .st-key-phase2_section {
+    margin-top: 1rem;
+}
+
+
+/* Fase 2 · fondo de cada tarjeta «Residuo N» (gris claro, distinto del blanco del
+   contenedor exterior y del verde muy claro de result_card). Cubre las dos formas en que
+   Streamlit puede pintar el borde: en el propio bloque con key o en su wrapper padre.
+   Acotado a .st-key-phase2_section; no afecta a ningun otro contenedor. */
+
+.stApp .st-key-phase2_section [class*="st-key-phase2_card_"],
+.stApp .st-key-phase2_section [data-testid="stVerticalBlockBorderWrapper"]:has(>[class*="st-key-phase2_card_"]) {
+    background: #EDF1EE;
+}
+
+
+/* Fase 2 · centra horizontalmente el recorte (y su leyenda) dentro de cada «Residuo N».
+   Streamlit deja el elemento de imagen ajustado al ancho del recorte y pegado a la izquierda;
+   aqui el contenedor del elemento ocupa todo el ancho de la tarjeta y centra su contenido.
+   Solo afecta a imagenes dentro de las tarjetas phase2_card_*. */
+
+.stApp .st-key-phase2_section [class*="st-key-phase2_card_"] [data-testid="stElementContainer"]:has([data-testid="stImage"]) {
+    width: 100% !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+@media (max-width: 640px) {
+    .stApp .st-key-phase1_card,
+    .stApp .st-key-phase2_section {
+        padding: 1rem;
     }
 }
