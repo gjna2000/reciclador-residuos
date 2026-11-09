@@ -1,0 +1,11 @@
+image,configuration,threshold,inference_ms,candidate_count,selected_count,label,score,box_xyxy,annotated_image
+babana_coffee_sachet_1.jpg,configuration_01,0.05,5896.77,155,4,wrapper,0.2427,"340.0,169.0,1010.0,745.0",benchmarks/gdino_calibration_v2_results/babana_coffee_sachet_1_configuration_01.jpg
+babana_coffee_sachet_1.jpg,configuration_01,0.05,5896.77,155,4,wrapper,0.2323,"159.0,171.0,619.0,515.0",benchmarks/gdino_calibration_v2_results/babana_coffee_sachet_1_configuration_01.jpg
+babana_coffee_sachet_1.jpg,configuration_01,0.05,5896.77,155,4,peel,0.1489,"433.0,314.0,524.0,416.0",benchmarks/gdino_calibration_v2_results/babana_coffee_sachet_1_configuration_01.jpg
+babana_coffee_sachet_1.jpg,configuration_01,0.05,5896.77,155,4,peel,0.1281,"4.0,0.0,1009.0,540.0",benchmarks/gdino_calibration_v2_results/babana_coffee_sachet_1_configuration_01.jpg
+babana_coffee_sachet_1.jpg,configuration_02,0.1,5857.38,24,4,wrapper,0.2427,"340.0,169.0,1010.0,745.0",benchmarks/gdino_calibration_v2_results/babana_coffee_sachet_1_configuration_02.jpg
+babana_coffee_sachet_1.jpg,configuration_02,0.1,5857.38,24,4,wrapper,0.2323,"159.0,171.0,619.0,515.0",benchmarks/gdino_calibration_v2_results/babana_coffee_sachet_1_configuration_02.jpg
+babana_coffee_sachet_1.jpg,configuration_02,0.1,5857.38,24,4,peel,0.1489,"433.0,314.0,524.0,416.0",benchmarks/gdino_calibration_v2_results/babana_coffee_sachet_1_configuration_02.jpg
+babana_coffee_sachet_1.jpg,configuration_02,0.1,5857.38,24,4,peel,0.1281,"4.0,0.0,1009.0,540.0",benchmarks/gdino_calibration_v2_results/babana_coffee_sachet_1_configuration_02.jpg
+babana_coffee_sachet_1.jpg,configuration_03,0.2,5957.38,4,2,wrapper,0.2427,"340.0,169.0,1010.0,745.0",benchmarks/gdino_calibration_v2_results/babana_coffee_sachet_1_configuration_03.jpg
+babana_coffee_sachet_1.jpg,configuration_03,0.2,5957.38,4,2,wrapper,0.2323,"159.0,171.0,619.0,515.0",benchmarks/gdino_calibration_v2_results/babana_coffee_sachet_1_configuration_03.jpg

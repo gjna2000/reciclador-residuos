@@ -1,0 +1,7 @@
+image,configuration,threshold,inference_ms,candidate_count,selected_count,label,score,box_xyxy,annotated_image
+exit_mf.jpeg,configuration_01,0.05,6764.82,39,4,wrapper,0.1099,"284.0,69.0,527.0,265.0",benchmarks/gdino_calibration_v2_results/exit_mf_configuration_01.jpg
+exit_mf.jpeg,configuration_01,0.05,6764.82,39,4,wrapper,0.0858,"283.0,0.0,1022.0,389.0",benchmarks/gdino_calibration_v2_results/exit_mf_configuration_01.jpg
+exit_mf.jpeg,configuration_01,0.05,6764.82,39,4,wrapper,0.0852,"410.0,398.0,478.0,438.0",benchmarks/gdino_calibration_v2_results/exit_mf_configuration_01.jpg
+exit_mf.jpeg,configuration_01,0.05,6764.82,39,4,wrapper,0.0774,"0.0,0.0,318.0,575.0",benchmarks/gdino_calibration_v2_results/exit_mf_configuration_01.jpg
+exit_mf.jpeg,configuration_02,0.1,6857.80,6,1,wrapper,0.1099,"284.0,69.0,527.0,265.0",benchmarks/gdino_calibration_v2_results/exit_mf_configuration_02.jpg
+exit_mf.jpeg,configuration_03,0.2,6663.76,0,0,,,,benchmarks/gdino_calibration_v2_results/exit_mf_configuration_03.jpg
